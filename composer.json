@@ -1,5 +1,5 @@
 {
-  "name": "evolution-cms/a-latte-x",
+  "name": "elcreator/a-latte-x",
   "description": "A Latte eXtended template parser for Evolution CMS",
   "type": "evolutioncms-plugin",
   "keywords": [
@@ -17,13 +17,13 @@
   },
   "autoload": {
     "psr-4": {
-      "EvolutionCMS\\aLatteX\\": "src/"
+      "Elcreator\\aLatteX\\": "src/"
     }
   },
   "extra": {
     "laravel": {
       "providers": [
-        "EvolutionCMS\\aLatteX\\aLattexServiceProvider"
+        "Elcreator\\aLatteX\\aLattexServiceProvider"
       ]
     }
   }

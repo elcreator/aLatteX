@@ -1,6 +1,6 @@
 <?php
 
-namespace EvolutionCMS\aLatteX;
+namespace Elcreator\aLatteX;
 
 use EvolutionCMS\ServiceProvider;
 

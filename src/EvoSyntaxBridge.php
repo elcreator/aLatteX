@@ -1,6 +1,6 @@
 <?php
 
-namespace EvolutionCMS\aLatteX;
+namespace Elcreator\aLatteX;
 
 /**
  * Protects Evolution CMS template syntax from being interpreted by Latte,

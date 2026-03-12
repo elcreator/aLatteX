@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "cf70f5e94a5284b557d8ea289aac8e8a",
+    "content-hash": "a2b2de329b590fb30abf133cc929a738",
     "packages": [
         {
             "name": "evolution-cms/evolution",

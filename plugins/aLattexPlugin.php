@@ -1,6 +1,6 @@
 <?php
 
-use EvolutionCMS\aLatteX\LattexEngine;
+use Elcreator\aLatteX\LattexEngine;
 
 // ---------------------------------------------------------------------------
 // Front-end: process templates through Latte when aLatteX is selected
