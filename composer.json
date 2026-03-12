@@ -1,0 +1,30 @@
+{
+  "name": "evolution-cms/a-latte-x",
+  "description": "A Latte eXtended template parser for Evolution CMS",
+  "type": "evolutioncms-plugin",
+  "keywords": [
+    "evo",
+    "evocms",
+    "evolution",
+    "evolution-cms",
+    "latte",
+    "template"
+  ],
+  "require": {
+    "php": "^8.3",
+    "evolution-cms/evolution": "^3.5.2",
+    "latte/latte": "^3.1"
+  },
+  "autoload": {
+    "psr-4": {
+      "EvolutionCMS\\aLatteX\\": "src/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "EvolutionCMS\\aLatteX\\aLattexServiceProvider"
+      ]
+    }
+  }
+}
