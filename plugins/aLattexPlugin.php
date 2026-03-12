@@ -8,19 +8,19 @@ use EvolutionCMS\aLatteX\LattexEngine;
 
 /**
  * OnLoadWebDocument fires after the template content has been loaded from DB
- * into $modx->documentContent, but before EVO's own parseDocumentSource() runs.
+ * into evo()->documentContent, but before EVO's own parseDocumentSource() runs.
  *
  * We intercept here, process through Latte, and put the result back. EVO then
  * parses any remaining {{chunk}}, [[snippet]], [*tv*] tags normally.
  */
 Event::listen('evolution.OnLoadWebDocument', function (): void {
-    $modx = evo();
+    $evo = evo();
 
-    if ($modx->getConfig('chunk_processor') !== 'aLatteX') {
+    if ($evo->getConfig('chunk_processor') !== 'aLatteX') {
         return;
     }
 
-    $content = $modx->documentContent;
+    $content = $evo->documentContent;
 
     if (empty($content)) {
         return;
@@ -30,12 +30,12 @@ Event::listen('evolution.OnLoadWebDocument', function (): void {
         /** @var LattexEngine $engine */
         $engine = app(LattexEngine::class);
 
-        $modx->documentContent = $engine->render(
+        $evo->documentContent = $engine->render(
             $content,
-            $modx->documentObject ?? []
+            $evo->documentObject ?? []
         );
     } catch (\Throwable $e) {
-        $modx->logEvent(
+        $evo->logEvent(
             0,
             3,
             'aLatteX template error: ' . $e->getMessage()
@@ -55,7 +55,7 @@ Event::listen('evolution.OnLoadWebDocument', function (): void {
  * The script adds an "aLatteX" radio button after "DLTemplate".
  */
 Event::listen('evolution.OnManagerMainFrameHeaderHTMLBlock', function (): string {
-    $modx = evo();
+    $evo = evo();
 
     // Only act on the system-settings page (action 17 = "Editing settings")
     $action = (string) ($_GET['a'] ?? $_POST['a'] ?? '');
@@ -64,7 +64,7 @@ Event::listen('evolution.OnManagerMainFrameHeaderHTMLBlock', function (): string
     }
 
     $currentValue = htmlspecialchars(
-        (string) $modx->getConfig('chunk_processor'),
+        (string) $evo->getConfig('chunk_processor'),
         ENT_QUOTES
     );
 

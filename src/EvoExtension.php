@@ -74,7 +74,7 @@ class EvoExtension extends Extension
         return (string) evo()->getConfig($name);
     }
 
-    /** Return a placeholder value previously set via $modx->setPlaceholder(). */
+    /** Return a placeholder value previously set via evo()->setPlaceholder(). */
     public function placeholder(string $name): string
     {
         return (string) (evo()->placeholders[$name] ?? '');
