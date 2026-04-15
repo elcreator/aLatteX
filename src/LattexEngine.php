@@ -15,7 +15,7 @@ use Latte\Loaders\StringLoader;
  *  4. EVO's parseDocumentSource() – EVO handles its own tags normally
  *
  * Template variables available in Latte:
- *  $modx            – the Evolution CMS core object
+ *  $x            – the Evolution CMS core object
  *  $documentObject  – associative array of the current document (all fields + TVs)
  *  All document fields are also spread as top-level variables so authors can write
  *  {$pagetitle}, {$alias}, {$longtitle}, {$content}, etc. directly.
@@ -63,11 +63,11 @@ class LattexEngine
         $protected = $this->bridge->protect($templateContent);
 
         // 2. Build Latte params: spread document fields as top-level variables
-        //    plus keep $modx and $documentObject for structured access.
+        //    plus keep $evo and $documentObject for structured access.
         $params = array_merge(
             $documentObject,
             [
-                'modx'           => evo(),
+                'evo'            => evo(),
                 'documentObject' => $documentObject,
             ]
         );

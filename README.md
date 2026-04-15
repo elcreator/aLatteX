@@ -62,12 +62,12 @@ Templates are written in the admin panel (*Elements → Templates*) using standa
 
 ### Available variables
 
-| Variable | Description |
-|---|---|
-| `$modx` | Evolution CMS core object |
-| `$documentObject` | Full document array (all fields + TVs) |
+| Variable                         | Description |
+|----------------------------------|---|
+| `$evo`                           | Evolution CMS core object |
+| `$documentObject`                | Full document array (all fields + TVs) |
 | `$pagetitle`, `$alias`, `$id`, … | All document fields spread as top-level variables |
-| `$content` | Raw document content (also available as `[*content*]`) |
+| `$content`                       | Raw document content (also available as `[*content*]`) |
 
 ### Example template
 
