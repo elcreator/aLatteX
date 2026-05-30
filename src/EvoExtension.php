@@ -3,6 +3,7 @@
 namespace Elcreator\aLatteX;
 
 use Latte\Extension;
+use Latte\Runtime\Html;
 
 /**
  * Latte extension that exposes Evolution CMS helpers as native Latte functions.
@@ -36,9 +37,9 @@ class EvoExtension extends Extension
     // -------------------------------------------------------------------------
 
     /** Render an HTML chunk by name (may include EVO syntax itself). */
-    public function chunk(string $name): string
+    public function chunk(string $name): Html
     {
-        return (string) evo()->getChunk($name);
+        return new Html((string) evo()->getChunk($name));
     }
 
     /**
@@ -47,9 +48,9 @@ class EvoExtension extends Extension
      *
      * @param array<string, string> $params
      */
-    public function snippet(string $name, array $params = []): string
+    public function snippet(string $name, array $params = []): Html
     {
-        return '[[' . $name . $this->buildParamString($params) . ']]';
+        return new Html('[[' . $name . $this->buildParamString($params) . ']]');
     }
 
     /**
@@ -57,9 +58,9 @@ class EvoExtension extends Extension
      *
      * @param array<string, string> $params
      */
-    public function uncachedSnippet(string $name, array $params = []): string
+    public function uncachedSnippet(string $name, array $params = []): Html
     {
-        return '[!' . $name . $this->buildParamString($params) . '!]';
+        return new Html('[!' . $name . $this->buildParamString($params) . '!]');
     }
 
     /** Return a raw template variable / document field value. */
