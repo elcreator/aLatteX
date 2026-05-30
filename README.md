@@ -24,10 +24,6 @@ php artisan package:installrequire elcreator/a-latte-x "*"
 
 Then open **System Settings → Site** and select **aLatteX** in the *Chunk processor* radio group.
 
-Do not copy or publish the package's `vendor/` directory. aLatteX is installed
-through Composer, so Composer installs the package dependencies from
-`composer.json` automatically, including `latte/latte`.
-
 ---
 
 ## How it works
@@ -214,4 +210,4 @@ aLatteX/
 
 ## License
 
-GPL-2.0-or-later
+GPL-3.0-or-later
