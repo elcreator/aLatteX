@@ -19,10 +19,14 @@ All existing Evolution CMS template syntax is fully supported alongside Latte sy
 ## Installation
 
 ```bash
-php artisan package:installrequire evolution-cms/a-latte-x "*"
+php artisan package:installrequire elcreator/a-latte-x "*"
 ```
 
 Then open **System Settings → Site** and select **aLatteX** in the *Chunk processor* radio group.
+
+Do not copy or publish the package's `vendor/` directory. aLatteX is installed
+through Composer, so Composer installs the package dependencies from
+`composer.json` automatically, including `latte/latte`.
 
 ---
 
@@ -47,6 +51,45 @@ EVO parseDocumentSource()    — EVO resolves {{chunks}}, [[snippets]], [*tvs*],
 ```
 
 The bridge ensures Latte never sees Evolution CMS tags, so neither parser interferes with the other.
+
+### Compatibility with regular EVO template code
+
+aLatteX works as a pre-processing layer before Evolution CMS's normal parser.
+Classic EVO tags written directly in the template are protected while Latte is
+rendering and restored before Evolution CMS calls `parseDocumentSource()`.
+
+That means existing template code like this continues to be processed by
+Evolution CMS after Latte finishes:
+
+```html
+{{chunk}}
+[[snippet]]
+[!snippet!]
+[*pagetitle*]
+[*content*]
+[(site_name)]
+[+placeholder+]
+[[snippet?&id=`[*id*]`]]
+```
+
+Processing order:
+
+```text
+DB template
+    -> aLatteX protects EVO tags
+    -> Latte renders Latte syntax
+    -> aLatteX restores EVO tags
+    -> Evolution CMS parseDocumentSource() resolves EVO tags
+```
+
+Important caveats:
+
+- Latte runs before Evolution CMS parses chunks, snippets, TVs, settings, and
+  placeholders.
+- Latte syntax inside chunks or snippet output is not processed later, because
+  those values are generated after Latte has already finished.
+- Regular EVO tags written directly in the template are passed through for the
+  default Evolution CMS parser to handle.
 
 ### Caching
 
