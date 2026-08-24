@@ -20,6 +20,9 @@
       "Elcreator\\aLatteX\\": "src/"
     }
   },
+  "scripts": {
+    "test": "php tests/run.php"
+  },
   "extra": {
     "laravel": {
       "providers": [
