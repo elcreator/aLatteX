@@ -1,5 +1,6 @@
 {
   "name": "elcreator/alattex",
+  "license": "GPL-3.0-or-later",
   "description": "A Latte eXtended template parser for Evolution CMS",
   "type": "evolutioncms-plugin",
   "keywords": [
