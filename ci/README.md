@@ -94,7 +94,7 @@ promise takes two composer runs rather than one:
 step 2, so the claim is checked on every build rather than assumed:
 
 ```
-added    elcreator/a-latte-x dev-main
+added    elcreator/alattex dev-main
 added    latte/latte v3.1.6
 
 2 added, 0 removed, 0 moved off the version the CMS pinned

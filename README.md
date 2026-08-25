@@ -19,7 +19,7 @@ All existing Evolution CMS template syntax is fully supported alongside Latte sy
 ## Installation
 
 ```bash
-php artisan package:installrequire elcreator/a-latte-x "*"
+php artisan package:installrequire elcreator/alattex "*"
 ```
 
 Then open **System Settings → Site** and select **aLatteX** in the *Chunk processor* radio group.
