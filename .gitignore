@@ -3,4 +3,5 @@
 /tmp
 /vendor
 /dist/
-'composer.lock' 
+/composer.lock
+/.phpunit.cache/
