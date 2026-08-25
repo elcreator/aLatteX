@@ -1,5 +1,5 @@
 {
-  "name": "elcreator/a-latte-x",
+  "name": "elcreator/alattex",
   "description": "A Latte eXtended template parser for Evolution CMS",
   "type": "evolutioncms-plugin",
   "keywords": [
