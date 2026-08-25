@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace ELCreator\ALatteX\Sync;
+namespace Elcreator\aLatteX\Sync;
 
 use DOMDocument;
 use DOMElement;
