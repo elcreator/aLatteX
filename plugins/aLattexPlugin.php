@@ -20,6 +20,20 @@ Event::listen('evolution.OnLoadWebDocument', function (): void {
         return;
     }
 
+    // A document whose template alias resolves to a file under /views/ has
+    // already been rendered by that file's engine - Latte's own .latte files
+    // included - and the CMS skips its parser for it. documentContent is
+    // finished HTML at this point, not template code, and running it through
+    // Latte again is a second pass over somebody else's output: a no-op at
+    // best, and at worst it aborts on the first brace of an inline stylesheet
+    // and logs an error on every request.
+    $renderedFromView = property_exists($evo, 'documentTemplateView')
+        ? (string) $evo->documentTemplateView
+        : '';
+    if ($renderedFromView !== '') {
+        return;
+    }
+
     $content = $evo->documentContent;
 
     if (empty($content)) {
@@ -63,9 +77,11 @@ Event::listen('evolution.OnManagerMainFrameHeaderHTMLBlock', function (): string
         return '';
     }
 
-    $currentValue = htmlspecialchars(
+    // json_encode, not htmlspecialchars: this lands in a JavaScript string
+    // literal, not in markup.
+    $currentValue = json_encode(
         (string) $evo->getConfig('chunk_processor'),
-        ENT_QUOTES
+        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
     );
 
     return <<<HTML
@@ -84,10 +100,12 @@ Event::listen('evolution.OnManagerMainFrameHeaderHTMLBlock', function (): string
             return; // Not on system settings page or DOM not yet ready
         }
 
-        // Find the last radio's wrapper element to clone structure
+        // manager::form.radio wraps every option in its own <div class="radio">
+        // holding a <label>. Cloning the label alone would drop aLatteX into
+        // the previous option's row, sharing its line; the row is the wrapper.
         var lastRadio = radios[radios.length - 1];
-        var wrapper   = lastRadio.closest('label') || lastRadio.parentElement;
-        if (!wrapper) {
+        var wrapper   = lastRadio.closest('.radio') || lastRadio.closest('label') || lastRadio.parentElement;
+        if (!wrapper || !wrapper.parentNode) {
             return;
         }
 
@@ -97,33 +115,42 @@ Event::listen('evolution.OnManagerMainFrameHeaderHTMLBlock', function (): string
             return;
         }
 
-        // Configure the new radio
-        newInput.value   = 'aLatteX';
-        newInput.id      = 'chunk_processor_alattex';
-        newInput.checked = ('{$currentValue}' === 'aLatteX');
+        // Configure the new radio. The clone carries whatever checked attribute
+        // the cloned option was rendered with, so clear it as well as the
+        // property - otherwise two options claim to be checked in the markup.
+        var isCurrent = ({$currentValue} === 'aLatteX');
 
-        // Update visible label text — try common patterns
-        var textNode = newWrapper.querySelector('span.radio-label, span, div.label-text');
+        newInput.value = 'aLatteX';
+        newInput.id    = 'chunk_processor_alattex';
+        if (isCurrent) {
+            newInput.setAttribute('checked', 'checked');
+        } else {
+            newInput.removeAttribute('checked');
+        }
+        newInput.checked = isCurrent;
+
+        // The visible text is a bare text node next to the input, inside the
+        // label - not a span, and not a child of the row.
+        var newLabel = newWrapper.querySelector('label') || newWrapper;
+        var textNode = newLabel.querySelector('span.radio-label, span, div.label-text');
         if (textNode) {
             textNode.textContent = 'aLatteX';
         } else {
-            // Fallback: walk child nodes looking for a text node
-            for (var i = 0; i < newWrapper.childNodes.length; i++) {
-                var node = newWrapper.childNodes[i];
+            var replaced = false;
+            for (var i = 0; i < newLabel.childNodes.length; i++) {
+                var node = newLabel.childNodes[i];
                 if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
                     node.textContent = ' aLatteX';
+                    replaced = true;
                     break;
                 }
             }
+            if (!replaced) {
+                newLabel.appendChild(document.createTextNode(' aLatteX'));
+            }
         }
 
-        // Update <label for="..."> if present
-        var labelFor = newWrapper.querySelector('label[for]') || (newWrapper.tagName === 'LABEL' ? newWrapper : null);
-        if (labelFor) {
-            labelFor.setAttribute('for', 'chunk_processor_alattex');
-        }
-
-        // Insert right after the last existing radio wrapper
+        // Insert as its own row, right after the last existing one.
         wrapper.parentNode.insertBefore(newWrapper, wrapper.nextSibling);
 
         // Re-attach the CMS change handler (defined in system_settings.blade.php)
@@ -132,6 +159,19 @@ Event::listen('evolution.OnManagerMainFrameHeaderHTMLBlock', function (): string
                 setChangesChunkProcessor(this);
             }
         });
+
+        // The CMS runs setChangesChunkProcessor() once while parsing the page,
+        // before this option exists. With aLatteX stored, none of the options it
+        // can see is checked, so that first call decided the state of
+        // enable_filter / enable_at_syntax from nothing. Now that the checked
+        // option is in the DOM, let it decide again.
+        if (typeof setChangesChunkProcessor === 'function') {
+            try {
+                setChangesChunkProcessor(isCurrent ? newInput : undefined);
+            } catch (e) {
+                // An older manager throws here when no option is checked at all.
+            }
+        }
     }
 
     if (document.readyState === 'loading') {

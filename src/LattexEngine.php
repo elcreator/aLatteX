@@ -79,6 +79,48 @@ class LattexEngine
         return $this->bridge->restore($rendered);
     }
 
+    /**
+     * Render a .latte file for Laravel's view factory.
+     *
+     * Unlike render(), the result is final: a document rendered from a view
+     * file never reaches parseDocumentSource(), so EVO tags left in the output
+     * stay literal - exactly as they do in a .blade.php file today. They are
+     * still protected during the Latte pass so that a stray brace in EVO syntax
+     * cannot abort compilation.
+     *
+     * @param  string               $path    Absolute path to the .latte file
+     * @param  array<string, mixed> $data    View data shared by the CMS
+     * @return string
+     */
+    public function renderView(string $path, array $data = []): string
+    {
+        $contents = @file_get_contents($path);
+        if ($contents === false) {
+            throw new \RuntimeException('aLatteX cannot read the template file: ' . $path);
+        }
+
+        $documentObject = [];
+        if (isset($data['documentObject']) && is_array($data['documentObject'])) {
+            $documentObject = $data['documentObject'];
+        }
+
+        // Document fields stay available as bare variables, the same way they
+        // are in a template held in the database.
+        $params = array_merge(
+            $documentObject,
+            $data,
+            [
+                'evo' => evo(),
+                'documentObject' => $documentObject,
+            ]
+        );
+
+        $protected = $this->bridge->protect($contents);
+        $rendered = $this->latte->renderToString($protected, $params);
+
+        return $this->bridge->restore($rendered);
+    }
+
     // -------------------------------------------------------------------------
 
     private function resolveCacheDir(): string
