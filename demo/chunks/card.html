@@ -1,0 +1,26 @@
+{* --------------------------------------------------------------------------
+   aLatteXDemoCard - this chunk is Latte SOURCE, not finished HTML.
+
+   Included the ordinary way it comes out verbatim, braces and all: both the
+   chunk tag and evoChunk() hand the chunk to the page after Latte's pass is
+   over. The aLatteXDemoLatte snippet is what makes it render, by feeding the
+   chunk back through aLatteX's own engine.
+
+   Note what this comment does NOT contain: a tag naming this chunk or that
+   snippet. A Latte comment is only a comment while Latte is reading it, and
+   nothing runs Latte over a chunk that is included normally - so a tag in
+   here would be expanded by Evolution CMS, would pull this chunk in again,
+   and would keep doing so until the request runs out of memory. Element
+   names in chunk documentation stay in plain prose, or are written with HTML
+   entities.
+   ------------------------------------------------------------------------ *}
+<article class="alx-card">
+    <h3>{$title|upper}</h3>
+    <p>{$body|truncate:60}</p>
+    <ul class="alx-card-tags">
+        <li n:foreach="$tags as $tag" n:class="alx-tag, $iterator->first ? alx-tag--first">
+            {$tag|firstUpper}
+        </li>
+    </ul>
+    <p class="alx-card-meta">{count($tags)} tag{if count($tags) !== 1}s{/if}</p>
+</article>

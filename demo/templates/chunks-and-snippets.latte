@@ -1,0 +1,108 @@
+{* =========================================================================
+   aLatteX Demo 3 - Latte inside chunks and snippets
+
+   The question this page answers: "my chunk contains {$var} and it comes out
+   on the page as the four characters {$var}. Why?"
+
+   Because aLatteX processes the template, and only the template. Evolution
+   CMS expands {{chunks}} and [[snippets]] in parseDocumentSource(), which
+   runs after Latte has finished and does not call Latte again. A chunk is
+   therefore plain markup as far as Latte is concerned.
+
+   Three ways out, shown side by side below.
+   ========================================================================= *}
+<!doctype html>
+<html lang="{evoSetting('manager_language') ?: 'en'}">
+<head>
+    <meta charset="utf-8">
+    <title>{$pagetitle} - aLatteX demo</title>
+</head>
+<body class="alx alx-chunks">
+
+{{aLatteXDemoHeader}}
+
+<section id="literal">
+    <h3>1. What actually happens by default</h3>
+    <p>
+        aLatteXDemoCard is a chunk written in Latte. Included the ordinary
+        way, its tags reach the browser as text:
+    </p>
+
+    <h4>Via the EVO tag</h4>
+    <pre class="alx-literal">{{aLatteXDemoCard}}</pre>
+
+    <h4>Via evoChunk(), during Latte's own pass</h4>
+    {* evoChunk() does run during the Latte pass - but it returns the chunk as
+       finished Html, it does not compile it. Same literal result. *}
+    <pre class="alx-literal">{evoChunk('aLatteXDemoCard')}</pre>
+</section>
+
+<section id="rendered">
+    <h3>2. Render the chunk through aLatteX explicitly</h3>
+    <p>
+        aLatteXDemoLatte takes a chunk name, pulls the chunk, and runs it
+        through this plugin's engine - a second, deliberate Latte pass. Its
+        output is spliced into the page by Evolution CMS like any other
+        snippet output, so EVO tags the chunk produced still resolve.
+    </p>
+
+    [[aLatteXDemoLatte?
+        &chunk=`aLatteXDemoCard`
+        &vars=`{"title":"Rendered from a chunk","body":"The chunk was compiled by a second Latte pass, started from PHP inside a snippet.","tags":["latte","chunk","snippet"]}`
+    ]]
+
+    <h4>The same snippet with inline Latte instead of a chunk</h4>
+    [[aLatteXDemoLatte?
+        &code=`<p>Inline Latte, document {$id}: {$pagetitle|upper}</p>`
+        &vars=`{}`
+    ]]
+</section>
+
+<section id="inverted">
+    <h3>3. Keep the loop in the template and the markup in the chunk</h3>
+    <p>
+        Usually the better answer. Latte does the logic where it is cheap, and
+        the chunk stays what a chunk is good at - a lump of markup Evolution
+        CMS can fill in.
+    </p>
+
+    {var $rows = [
+        ['title' => 'First', 'body' => 'Built by the template.'],
+        ['title' => 'Second', 'body' => 'No second pass needed.'],
+        ['title' => 'Third', 'body' => 'Chunk stays plain markup.'],
+    ]}
+
+    <div class="alx-grid">
+        {foreach $rows as $row}
+            <article class="alx-card">
+                <h4>{$row['title']}</h4>
+                <p>{$row['body']}</p>
+                {* A snippet call assembled per iteration. *}
+                {evoSnippet('aLatteXDemoList', [
+                    'items' => $row['title'] . '||' . $iterator->counter,
+                    'class' => 'alx-row-' . $iterator->counter,
+                ])}
+            </article>
+        {/foreach}
+    </div>
+</section>
+
+<section id="snippet-output">
+    <h3>Snippet output is not Latte either</h3>
+    <p>
+        The rule is symmetrical. A snippet that returns
+        <code>&#123;$pagetitle&#125;</code> produces those characters, because
+        no Latte pass remains to interpret them. If a snippet needs to build
+        markup from a template, it must render that template itself, the way
+        aLatteXDemoLatte does.
+    </p>
+    <p>What a snippet returns is still parsed for EVO tags, though:</p>
+    [[aLatteXDemoNested? &depth=`1`]]
+</section>
+
+<main class="alx-content">[*content*]</main>
+
+{{aLatteXDemoFooter}}
+
+</body>
+</html>

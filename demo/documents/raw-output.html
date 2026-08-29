@@ -1,0 +1,75 @@
+<p>
+    Braces belong to two parsers here, and each has to be told separately to
+    leave them alone. This page covers Latte's escape hatches, the fact that
+    none of them stop the Evolution CMS parser, and the two innocent-looking
+    expressions that aLatteX's tag protection mistakes for EVO tags.
+</p>
+
+<aside class="alx-hint">
+    <h3>Read this page's template</h3>
+    <p>
+        The sections around this text come from the template <strong>aLatteX
+        Demo: Raw output</strong> - <em>Elements &rarr; Templates</em>, category
+        <em>aLatteX demo</em>; in the package it is
+        <code>demo/templates/raw-output.latte</code>. It is the one template
+        worth reading in the editor rather than in the browser, because the
+        source and the output are the whole comparison. Find:
+    </p>
+    <ul>
+        <li>
+            section <code>#braces</code> - <code>{l}</code> and
+            <code>{r}</code>, the two tags that print a brace.
+        </li>
+        <li>
+            section <code>#syntax-off</code> - <code>{syntax off}</code>, which
+            switches Latte off for a whole region, and what it does not switch
+            off.
+        </li>
+        <li>
+            section <code>#escaping</code> - context-aware escaping, and
+            <code>|noescape</code> for when you mean the markup.
+        </li>
+        <li>
+            section <code>#evo-verbatim</code> - how to <em>show</em> an EVO tag
+            on a page instead of running it. Latte's escape hatches do not help:
+            the CMS parser runs after Latte and sees whatever Latte printed.
+        </li>
+        <li>
+            section <code>#gotchas</code> - the two expressions that look like
+            EVO tags to the bridge's regex. Worth knowing before you write one
+            by accident.
+        </li>
+    </ul>
+</aside>
+
+<section class="alx-live">
+    <h3>The same problem, in this content field</h3>
+    <p>
+        Content is simpler than a template: Latte never reads it, so braces need
+        no escaping at all. This line contains {$pagetitle} and {if $x}{/if} and
+        nothing had to be done to protect them - they are just text.
+    </p>
+    <p>
+        EVO tags are the opposite. They <em>do</em> run here, so showing one
+        means breaking it up with HTML entities, exactly as the template does:
+    </p>
+    <ul>
+        <li>
+            Written <code>&amp;#91;*pagetitle*&amp;#93;</code>, it shows as
+            <code>&#91;*pagetitle*&#93;</code> - the tag as text.
+        </li>
+        <li>
+            Written normally, it runs: <strong>[*pagetitle*]</strong>.
+        </li>
+        <li>
+            Same for a chunk: <code>&#123;&#123;aLatteXDemoBadge&#125;&#125;</code>
+            as text, and {{aLatteXDemoBadge}} as the chunk.
+        </li>
+    </ul>
+    <p>
+        The entity is resolved by the browser, long after both parsers have
+        finished, which is why it is the one escape that always works. A
+        <code>&lt;code&gt;</code> wrapper is not an escape - the CMS parser does
+        not care what element a tag sits in.
+    </p>
+</section>

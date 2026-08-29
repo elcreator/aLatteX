@@ -1,0 +1,152 @@
+{* =========================================================================
+   aLatteX Demo 2 - Evolution CMS syntax, and the bridge between the two
+
+   Every classic EVO tag is written here verbatim. aLatteX replaces each one
+   with an opaque token before Latte runs and puts it back afterwards, so
+   Latte never sees a brace or a bracket that belongs to Evolution CMS, and
+   Evolution CMS receives its tags untouched for its own parse pass.
+
+   Below the pass-through section, the same six things are done again through
+   the Latte functions this plugin registers - the difference being that those
+   take Latte expressions as arguments, so a snippet call can be assembled
+   from template variables.
+   ========================================================================= *}
+<!doctype html>
+<html lang="{evoSetting('manager_language') ?: 'en'}">
+<head>
+    <meta charset="utf-8">
+    <title>{$pagetitle} - aLatteX demo</title>
+</head>
+<body class="alx alx-evo">
+
+{{aLatteXDemoHeader}}
+
+<section id="passthrough">
+    <h3>Classic EVO tags, passed through untouched</h3>
+
+    {* The <dt> labels are written with HTML entities on purpose. Neither
+       Latte nor Evolution CMS has a "print this tag literally" construct that
+       survives both passes - {l}{r} and {syntax off} only stop Latte, and the
+       EVO parser would still expand a real tag. An entity is the one form
+       that reaches the browser as text. *}
+    <dl>
+        <dt><code>&#123;&#123;chunk&#125;&#125;</code> - HTML chunk</dt>
+        <dd>{{aLatteXDemoBadge}}</dd>
+
+        <dt><code>&#91;&#91;snippet&#93;&#93;</code> - cacheable snippet</dt>
+        <dd>[[aLatteXDemoClock]]</dd>
+
+        <dt><code>&#91;!snippet!&#93;</code> - non-cacheable snippet</dt>
+        <dd>[!aLatteXDemoClock!]</dd>
+
+        <dt><code>&#91;*field*&#93;</code> - document field or template variable</dt>
+        <dd>[*pagetitle*] / [*alxSubtitle*] / [*alxTags*]</dd>
+
+        <dt><code>&#91;(setting)&#93;</code> - system setting</dt>
+        <dd>[(site_name)] on [(site_url)]</dd>
+
+        <dt><code>&#91;+placeholder+&#93;</code> - placeholder set by a snippet</dt>
+        <dd>[+alx_note+]</dd>
+    </dl>
+
+    <h4>Snippet parameters</h4>
+    [[aLatteXDemoList? &items=`one||two||three` &class=`alx-passthrough`]]
+
+    <h4>A parameter whose value is itself an EVO tag</h4>
+    [[aLatteXDemoList? &items=`[*pagetitle*]||[(site_name)]` &class=`alx-mixed`]]
+
+    <h4>Nested snippet calls</h4>
+    {* aLatteXDemoNested returns EVO tags of its own; Evolution CMS resolves
+       them on a later parse pass, so nesting needs nothing from aLatteX. *}
+    [[aLatteXDemoNested? &depth=`2`]]
+
+    <h4>A chunk that calls a snippet</h4>
+    {{aLatteXDemoNav}}
+</section>
+
+<section id="functions">
+    <h3>The same six things, as Latte functions</h3>
+
+    {var $tagList = ['latte', 'evo', 'demo']}
+    {var $listClass = 'alx-from-latte'}
+
+    <dl>
+        <dt>evoChunk()</dt>
+        <dd>
+            {* Renders the chunk immediately, during Latte's pass, and returns
+               it as raw HTML. Whatever EVO tags the chunk contains are still
+               resolved later by Evolution CMS. *}
+            {evoChunk('aLatteXDemoBadge')}
+        </dd>
+
+        <dt>evoSnippet()</dt>
+        <dd>
+            {* Does NOT run the snippet. It writes the [[tag]] for you, so the
+               snippet still goes through Evolution CMS's caching. The win over
+               writing [[...]] by hand is that the arguments are Latte
+               expressions. *}
+            {evoSnippet('aLatteXDemoList', [
+                'items' => implode('||', $tagList),
+                'class' => $listClass,
+                'note'  => 'Note assembled in Latte for document ' . $id,
+            ])}
+        </dd>
+
+        <dt>evoUncachedSnippet()</dt>
+        <dd>{evoUncachedSnippet('aLatteXDemoClock', ['format' => 'H:i:s'])}</dd>
+
+        <dt>evoTv()</dt>
+        <dd>{evoTv('alxSubtitle')} / {evoTv('pagetitle')}</dd>
+
+        <dt>evoSetting()</dt>
+        <dd>{evoSetting('site_name')} (escaped, note the ampersand)</dd>
+
+        <dt>evoPlaceholder()</dt>
+        <dd>
+            {* Reads what evo()->setPlaceholder() has stored. During Latte's
+               pass most placeholders do not exist yet - a snippet on this page
+               sets them later - so this is mainly useful for placeholders a
+               plugin published on an earlier event. *}
+            {evoPlaceholder('alx_note') ?: 'not set during the Latte pass'}
+        </dd>
+    </dl>
+
+    <h4>Where the functions earn their keep</h4>
+    {* A snippet call that could not be written as a literal [[tag]], because
+       the parameters come out of a loop. *}
+    <ul>
+        {foreach $tagList as $tag}
+            <li>{evoSnippet('aLatteXDemoList', ['items' => $tag, 'class' => 'alx-tag-' . $tag])}</li>
+        {/foreach}
+    </ul>
+
+    {* Conditional snippet choice - impossible with a bare [[tag]]. *}
+    {if $published}
+        {evoSnippet('aLatteXDemoClock', ['format' => 'Y-m-d'])}
+    {else}
+        {evoUncachedSnippet('aLatteXDemoClock')}
+    {/if}
+</section>
+
+<section id="order">
+    <h3>Order of operations</h3>
+    <p>
+        Latte runs first and Evolution CMS second. That is the single fact
+        that explains every surprise on these pages: a Latte variable cannot
+        depend on a snippet's output, and a snippet cannot emit Latte for the
+        template to pick up.
+    </p>
+    <ol>
+        <li>aLatteX replaces every EVO tag with a token.</li>
+        <li>Latte compiles and renders what is left.</li>
+        <li>aLatteX puts the EVO tags back.</li>
+        <li>Evolution CMS runs parseDocumentSource() over the result.</li>
+    </ol>
+</section>
+
+<main class="alx-content">[*content*]</main>
+
+{{aLatteXDemoFooter}}
+
+</body>
+</html>

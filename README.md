@@ -26,6 +26,37 @@ Then open **System Settings → Site** and select **aLatteX** in the *Chunk proc
 
 ---
 
+## Documentation
+
+| Page | Contents |
+|---|---|
+| [docs/latte-syntax.md](docs/latte-syntax.md) | Latte 3 as it behaves inside Evolution CMS, and the few features that are unavailable here |
+| [docs/evo-syntax.md](docs/evo-syntax.md) | The six EVO tag forms and the `evo*` Latte functions |
+| [docs/interop.md](docs/interop.md) | Parse order and everything that follows from it — chunks, snippets, raw output, caching |
+| [docs/demo.md](docs/demo.md) | The demo set, and how the test suite reuses it |
+
+---
+
+## Demo content
+
+A working example of every construct above — six pages, six templates, five
+chunks, four snippets and three template variables — can be installed into the
+site:
+
+```bash
+composer demo:install     # or: cd core && php artisan alattex:demo:install
+composer demo:remove      # or: cd core && php artisan alattex:demo:remove
+```
+
+Everything lands in an **aLatteX demo** category and under `/alattex-demo`, so
+it is one folder in each manager tree and one subtree in the resource tree.
+Both commands are idempotent, address elements by name, and prompt before
+running; pass `--force` to skip the prompt.
+
+The same files are this package's test fixtures — see [docs/demo.md](docs/demo.md).
+
+---
+
 ## How it works
 
 ### Rendering pipeline
@@ -197,13 +228,24 @@ Selecting **aLatteX** and saving enables Latte template processing site-wide.
 ```
 aLatteX/
 ├── composer.json
+├── bin/
+│   └── alattex-demo.php            composer demo:install / demo:remove → artisan
+├── demo/                           the demo set: manifest plus one file per element
+│   ├── manifest.php
+│   ├── chunks/  snippets/  templates/  documents/
+├── docs/                           syntax reference and interop notes
 ├── plugins/
-│   └── aLattexPlugin.php          Event listeners (OnLoadWebDocument, OnManagerMainFrameHeaderHTMLBlock)
+│   └── aLattexPlugin.php           Event listeners (OnLoadWebDocument, OnManagerMainFrameHeaderHTMLBlock)
 └── src/
     ├── aLattexServiceProvider.php  Laravel service provider
     ├── LattexEngine.php            Latte engine wrapper + render pipeline
+    ├── LatteViewEngine.php         renders views/<alias>.latte for the view factory
     ├── EvoSyntaxBridge.php         EVO tag protect/restore around Latte rendering
-    └── EvoExtension.php            Latte extension: evoChunk, evoSnippet, evoTv, …
+    ├── EvoExtension.php            Latte extension: evoChunk, evoSnippet, evoTv, …
+    ├── Console/                    DemoInstallCommand, DemoRemoveCommand
+    └── Demo/
+        ├── DemoContent.php         loads demo/ as data — no CMS, no database
+        └── DemoSeeder.php          writes it into a site, and takes it out again
 ```
 
 ---

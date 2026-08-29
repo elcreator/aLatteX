@@ -1,0 +1,201 @@
+{* =========================================================================
+   aLatteX Demo 1 - Latte basics
+
+   Stock Latte 3, nothing aLatteX-specific. The point of this page is that a
+   template kept in the Evolution CMS database gets the whole Latte feature
+   set, not a subset. Compare it against https://latte.nette.org/en/tags.
+
+   Document fields arrive as bare variables ($pagetitle, $content, $id, ...),
+   plus $documentObject (all of them, as an array) and $evo (the core object).
+   ========================================================================= *}
+<!doctype html>
+<html lang="{evoSetting('manager_language') ?: 'en'}">
+<head>
+    <meta charset="utf-8">
+    <title>{$pagetitle} - aLatteX demo</title>
+</head>
+<body class="alx alx-basics">
+
+{{aLatteXDemoHeader}}
+
+{* ---------------------------------------------------------------- vars -- *}
+{var $tags = ['latte', 'evo', 'demo']}
+{var $price = 1234.5}
+{var $when = '2026-08-28 09:30:00'}
+{var $empty = []}
+{default $heading = 'Latte basics'}
+
+{* A second assignment form, and a type hint for static analysis. *}
+{varType string $pagetitle}
+
+<h2>{$heading}</h2>
+
+{* ------------------------------------------------------- printing tags -- *}
+<section id="printing">
+    <h3>Printing</h3>
+    <p>Escaped by default: {$longtitle}</p>
+    <p>Expression: {= strrev('etpircs')}</p>
+    <p>Filters chain: {$pagetitle|lower|firstUpper|truncate:20}</p>
+    <p>Numbers: {$price|number:2, ',', ' '} and {$price|round:0}</p>
+    <p>Dates: {$when|date:'j.n.Y'}</p>
+    <p>Arrays: {$tags|implode:', '} / {$tags|first} / {$tags|last} / {$tags|length}</p>
+    <p>Sorted and reversed: {$tags|sort|reverse|implode:' > '}</p>
+    <p>Sliced: {$tags|slice:0, 2|implode:'+'}</p>
+    <p>Padded: {= '7'|padLeft:3, '0'}</p>
+    <p>Repeat: {= 'ab'|repeat:3}</p>
+    {* |webalize and |localDate come from nette/utils, which aLatteX does not require. *}
+    <p>Slug-ish: {$longtitle|lower|replace:' ', '-'}</p>
+    <p>Bytes: {1048576|bytes}</p>
+    <p>Explode: {= 'a||b||c'|explode:'||'|implode:' / '}</p>
+    {* Escaping shown on a short local value rather than on $content: the
+       content field is a whole block of markup, and printing it here as well
+       as in <main> would put the page's text on the page twice. *}
+    {var $markup = '<em>markup</em> from a variable'}
+    <p>Escaped by default: {$markup}</p>
+    <p>Raw HTML, escaping switched off: {$markup|noescape}</p>
+    <p>Strip tags: {$content|stripHtml|trim|truncate:60}</p>
+    <p>URL-safe: <a href="/search?q={$pagetitle|escapeUrl}">search</a></p>
+    <p>Query string: <a href="/search?{['q' => $pagetitle, 'page' => 2]|query}">search again</a></p>
+    <p>Null coalescing and ternary: {$missing ?? 'fallback'} / {$published ? 'live' : 'draft'}</p>
+</section>
+
+{* ------------------------------------------------------------ branching -- *}
+<section id="branching">
+    <h3>Branching</h3>
+
+    {if $published && $tags}
+        <p>Published with {count($tags)} tags.</p>
+    {elseif $published}
+        <p>Published, untagged.</p>
+    {else}
+        <p>Draft.</p>
+    {/if}
+
+    {ifset $alxSubtitle}<p>The subtitle TV is set.</p>{/ifset}
+
+    {* n:attributes - the same conditions written on the element itself. *}
+    <p n:if="$tags">This paragraph exists only when there are tags.</p>
+    <p n:ifset="$missing">You will never see this.</p>
+    <p n:class="alx-flag, $published ? alx-flag--live">n:class merges classes.</p>
+    <p n:attr="data-count: count($tags), title: $pagetitle">n:attr sets attributes.</p>
+    <p n:ifcontent>{$missing ?? ''}</p>
+    <p n:ifcontent>n:ifcontent keeps this one, because it is not empty.</p>
+    <span n:tag="$published ? 'strong' : 'em'">n:tag picks the element name.</span>
+
+    {switch count($tags)}
+        {case 0}<p>No tags.</p>
+        {case 1}<p>One tag.</p>
+        {default}<p>{count($tags)} tags.</p>
+    {/switch}
+</section>
+
+{* --------------------------------------------------------------- loops -- *}
+<section id="loops">
+    <h3>Loops</h3>
+
+    <ol>
+        {foreach $tags as $i => $tag}
+            {continueIf $tag === 'skip-me'}
+            <li>
+                {$iterator->counter}. {$tag|firstUpper}
+                {first}<em>(first)</em>{/first}
+                {last}<em>(last)</em>{/last}
+            </li>
+            {sep}<li class="alx-sep">-</li>{/sep}
+        {/foreach}
+    </ol>
+
+    <p>Empty collections take the {l}foreach{r} else branch:</p>
+    <ul>
+        {foreach $empty as $item}
+            <li>{$item}</li>
+        {else}
+            <li>Nothing to show.</li>
+        {/foreach}
+    </ul>
+
+    {* n:foreach, and n:inner-foreach which repeats only the contents. *}
+    <ul>
+        <li n:foreach="$tags as $tag">{$tag}</li>
+    </ul>
+    <ul n:inner-foreach="$tags as $tag">
+        <li>{$tag}</li>
+    </ul>
+
+    {* Chunk the list into rows of two. *}
+    {var $rows = ($tags|batch:2)}
+    <table>
+        <tr n:foreach="$rows as $row">
+            <td n:foreach="$row as $cell">{$cell ?? '-'}</td>
+        </tr>
+    </table>
+
+    {* Group consecutive items - iterateWhile is Latte's answer to
+       "start a new block whenever this value changes". *}
+    <ul>
+        {foreach [1, 1, 2, 2, 3] as $n}
+            <li>
+                group {$n}:
+                {iterateWhile}{$n} {/iterateWhile $iterator->nextValue === $n}
+            </li>
+        {/foreach}
+    </ul>
+
+    <p>{for $i = 1; $i <= 3; $i++}{if $i > 1}, {/if}{$i}{/for}</p>
+
+    {var $countdown = 3}
+    <p>{while $countdown > 0}{$countdown--}{if $countdown > 0}, {/if}{/while}</p>
+</section>
+
+{* ------------------------------------------------ blocks and includes -- *}
+<section id="blocks">
+    <h3>Blocks</h3>
+
+    {define alxNote, string $text, string $level = 'info'}
+        <p class="alx-note alx-note--{$level}">{$text}</p>
+    {/define}
+
+    {include alxNote, text: 'Included from a define, with arguments.'}
+    {include alxNote, text: 'Second call, different level.', level: 'warn'}
+
+    {block #intro}<p>A named block, printed where it stands.</p>{/block}
+
+    <div n:block="aside"><p>n:block turns an element into a block.</p></div>
+
+    {ifset #intro}<p>hasBlock: the intro block is defined.</p>{/ifset}
+
+    {* capture buffers output into a variable instead of printing it. *}
+    {capture $captured}
+        <strong>Captured markup</strong>
+    {/capture}
+    <p>Captured {strlen(trim((string) $captured))} bytes: {$captured}</p>
+
+    {* spaceless collapses whitespace between tags. *}
+    {spaceless}
+        <ul>
+            <li>a</li>
+            <li>b</li>
+        </ul>
+    {/spaceless}
+</section>
+
+{* ------------------------------------------------------------- control -- *}
+<section id="control">
+    <h3>Statements without output</h3>
+
+    {do $tags[] = 'added-by-do'}
+    <p>{l}do{r} runs an expression and prints nothing: {$tags|implode:', '}</p>
+
+    {try}
+        <p>{intdiv(1, 0)}</p>
+    {else}
+        <p>{l}try{r} swallowed the exception and printed this instead.</p>
+    {/try}
+</section>
+
+<main class="alx-content">[*content*]</main>
+
+{{aLatteXDemoFooter}}
+
+</body>
+</html>

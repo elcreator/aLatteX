@@ -1,0 +1,83 @@
+<p>
+    Stock Latte 3, rendered from a template stored in the database. Nothing on
+    this page is aLatteX-specific: the point is that a CMS template gets the
+    whole language, not a curated subset of it.
+</p>
+
+<aside class="alx-hint">
+    <h3>Read this page's template</h3>
+    <p>
+        The sections above and below come from the template
+        <strong>aLatteX Demo: Latte basics</strong> - <em>Elements &rarr;
+        Templates</em>, category <em>aLatteX demo</em>; in the package it is
+        <code>demo/templates/basics.latte</code>. Every value this page prints
+        is set in that file, not here. Find:
+    </p>
+    <ul>
+        <li>
+            near the top, <code>{var $tags = ['latte', 'evo', 'demo']}</code>,
+            <code>{var $price = 1234.5}</code>, <code>{default $heading = ...}</code>
+            and <code>{varType string $pagetitle}</code> - the four ways to
+            introduce a variable.
+        </li>
+        <li>
+            section <code>#printing</code> - filter chains such as
+            <code>{$pagetitle|lower|firstUpper|truncate:20}</code> and
+            <code>{$price|number:2, ',', ' '}</code>.
+        </li>
+        <li>
+            section <code>#branching</code> - <code>{if}</code>,
+            <code>{elseif}</code>, <code>{switch}</code>, and the same tests
+            written as <code>n:if</code> attributes on the element itself.
+        </li>
+        <li>
+            section <code>#loops</code> - <code>{foreach}</code> with
+            <code>$iterator-&gt;first</code>, <code>{for}</code>,
+            <code>{while}</code>, <code>n:foreach</code> and
+            <code>n:inner-foreach</code>.
+        </li>
+        <li>
+            section <code>#blocks</code> - <code>{define alxNote, string $text,
+            string $level = 'info'}</code>, a block with named arguments,
+            called three times with <code>{include}</code>.
+        </li>
+        <li>
+            section <code>#control</code> - <code>{do}</code>,
+            <code>{capture}</code>, <code>{spaceless}</code> and
+            <code>{try}</code>, the tags that produce no output of their own.
+        </li>
+    </ul>
+</aside>
+
+<section class="alx-live">
+    <h3>Latte stops before this field - proof</h3>
+    <p>
+        This paragraph lives in the resource's content, and content is not a
+        template: aLatteX renders the template, and only then does Evolution
+        CMS paste this text in at <code>&#91;*content*&#93;</code> and parse it.
+        So the two syntaxes behave in opposite ways here, which is worth seeing
+        once:
+    </p>
+    <ul>
+        <li>
+            Latte, inert: <code>{$pagetitle}</code> prints as
+            <strong>{$pagetitle}</strong>, and <code>{$price|number:2}</code>
+            prints as <strong>{$price|number:2}</strong>. No error, no value -
+            nothing ever compiled them.
+        </li>
+        <li>
+            EVO, live: <code>&#91;*pagetitle*&#93;</code> prints as
+            <strong>[*pagetitle*]</strong>, and
+            <code>&#91;(site_name)&#93;</code> as <strong>[(site_name)]</strong>.
+        </li>
+        <li>
+            Snippets run too: [[aLatteXDemoList? &items=`if||foreach||capture` &class=`alx-list`]]
+        </li>
+    </ul>
+    <p>
+        Move the same line into the template and it flips: there
+        <code>{$pagetitle}</code> is the one that resolves. If you want Latte to
+        process a chunk after its pass is over, see the <em>Chunks and
+        snippets</em> page.
+    </p>
+</section>

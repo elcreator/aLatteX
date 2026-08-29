@@ -1,0 +1,167 @@
+{* =========================================================================
+   aLatteX Demo 4 - raw output: braces that must survive
+
+   Two different parsers want the braces on this page, and each has its own
+   way of being told to keep its hands off:
+
+     Latte   {l} {r}, {syntax off}, n:syntax="off", |noescape
+     EVO     nothing. There is no verbatim in Evolution CMS's parser, so a
+             tag that must be *shown* rather than run is written with HTML
+             entities.
+
+   Knowing which of the two is eating your output is most of the battle, and
+   the rule is always the same: Latte first, Evolution CMS second.
+   ========================================================================= *}
+<!doctype html>
+<html lang="{evoSetting('manager_language') ?: 'en'}">
+<head>
+    <meta charset="utf-8">
+    <title>{$pagetitle} - aLatteX demo</title>
+
+    {* ------------------------------------------------------------------
+       A <style> block. Latte is normally relaxed about CSS - it ignores a
+       { that is followed by a space or a letter-less character - but a
+       minified rule or an interpolated value can still trip it, and
+       {syntax off} removes the doubt entirely.
+       ------------------------------------------------------------------ *}
+    {syntax off}
+    <style>
+        .alx-card{border:1px solid #ddd;padding:1rem}
+        .alx-card h3{margin:0 0 .5rem}
+        @media (min-width:40em){.alx-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}}
+    </style>
+    {/syntax}
+</head>
+<body class="alx alx-raw">
+
+{{aLatteXDemoHeader}}
+
+<section id="braces">
+    <h3>Printing a brace</h3>
+    <p>{l}l{r} and {l}r{r} print a single brace: {l} and {r}</p>
+    <p>So a Latte tag can be shown as text: {l}$pagetitle|upper{r}</p>
+    <p>And an expression is still an expression: {$pagetitle|upper}</p>
+</section>
+
+<section id="syntax-off">
+    <h3>{l}syntax off{r}</h3>
+    <p>
+        Everything between {l}syntax off{r} and its closing tag is copied out
+        byte for byte. This is the tool for JavaScript, JSON, CSS, and any
+        other language that owns the brace.
+    </p>
+
+    {syntax off}
+    <script>
+        // Latte would try to read the object literal below as a tag.
+        const alxConfig = {"theme": {"lineHeight": 1.5, "scale": [1, 2, 3]}};
+        function alxGreet(name) { return `Hello, ${name}`; }
+        document.querySelectorAll('.alx-card').forEach(el => { el.dataset.ready = '1'; });
+    </script>
+    {/syntax}
+
+    <p n:syntax="off">
+        n:syntax="off" does the same for one element: {$notAVariable} stays
+        as it is written.
+    </p>
+</section>
+
+<section id="escaping">
+    <h3>Escaping, and switching it off</h3>
+
+    {var $snippet = '<em>markup from a variable</em>'}
+
+    <p>Escaped, the default: {$snippet}</p>
+    <p>Raw, opted in: {$snippet|noescape}</p>
+
+    <p>
+        Latte escapes for the context it is in, not just for HTML. The same
+        variable inside an attribute, a URL and a script is escaped three
+        different ways:
+    </p>
+    <p title="{$pagetitle}" data-json="{$snippet}">attribute context</p>
+    <p><a href="/go?to={$alias|escapeUrl}">url context</a></p>
+    <script>
+        // javascript context - Latte json-encodes it for you
+        window.alxPage = {$pagetitle};
+    </script>
+
+    {* An anonymous block can be filtered as a whole - the filter applies to
+       everything it prints, markup included. *}
+    <p>{block|striptags|trim}{$snippet|noescape}{/block}</p>
+    <p>{block|stripHtml|trim|upper}   whitespace and case are filtered per block   {/block}</p>
+</section>
+
+<section id="evo-verbatim">
+    <h3>Showing an EVO tag instead of running it</h3>
+    <p>
+        {l}syntax off{r} stops Latte. It does not stop Evolution CMS: aLatteX
+        replaced the EVO tags with tokens <em>before</em> Latte ever saw the
+        template, so a tag inside a {l}syntax off{r} block is restored
+        afterwards and expanded exactly like any other. Proof - this is inside
+        the block below and it still runs:
+    </p>
+
+    {syntax off}
+    <pre>Latte tag, printed literally: {$pagetitle}
+Snippet, still expanded by Evolution CMS: [[aLatteXDemoClock]]</pre>
+    {/syntax}
+
+    <p>To show an EVO tag as text, write its brackets as HTML entities:</p>
+    <pre>&#91;&#91;aLatteXDemoClock&#93;&#93;
+&#123;&#123;aLatteXDemoBadge&#125;&#125;
+&#91;*pagetitle*&#93;
+&#91;(site_name)&#93;
+&#91;+alx_note+&#93;</pre>
+</section>
+
+<section id="gotchas">
+    <h3>Brackets that only look like tags</h3>
+
+    <p>
+        A nested array literal opens with two brackets, which is also how a
+        cacheable snippet call opens. aLatteX tells them apart by checking
+        whether what follows could actually name an element: a name starts
+        with a letter, <code>_</code>, <code>#</code> or <code>@</code>, and is
+        followed by the closing delimiter, or by <code>?</code>, <code>&amp;</code>
+        or a newline for parameters, or <code>:</code> for output filters. A
+        name can therefore never contain <code>&#93;</code>, and parameters can
+        never begin with one - which settles most of it. So these are all left
+        for Latte:
+    </p>
+
+    {var $matrix = [[1, 2], [3, 4]]}
+    {var $mixed = [[null], [true], ['x']]}
+    {var $names = [[\PHP_EOL], [\PHP_INT_MAX]]}
+    {var $i = 0}
+    <ul>
+        <li>Nested array literal: {$matrix[1][0]}</li>
+        <li>Constants - a name cannot end in <code>&#93;</code>, so
+            <code>&#91;&#91;X&#93;, &#91;Y&#93;&#93;</code> is an array:
+            {count($names)} inner arrays</li>
+        <li>Reserved words - <code>&#91;&#91;null&#93;&#93;</code> is valid
+            JSON, never a snippet: {$mixed[0][0] ?? 'null'}</li>
+        <li>Parenthesised subscript, which spells the setting form: {$matrix[($i + 1)][1]}</li>
+        <li>Negation in a subscript: {$matrix[0][!$i]}</li>
+    </ul>
+
+    <p>
+        Exactly one case is irreducible: <code>&#91;&#91;foo&#93;&#93;</code> is
+        a snippet call and a nested array holding one bare constant, spelled
+        identically. It is read as a snippet. Quote the identifier, or bind the
+        array to a variable.
+    </p>
+
+    <p>
+        And {l}syntax double{r} - the mode where <code>&#123;&#123;...&#125;&#125;</code> delimits Latte
+        tags - cannot be used at all, because those braces are how Evolution
+        CMS spells a chunk. aLatteX takes them first.
+    </p>
+</section>
+
+<main class="alx-content">[*content*]</main>
+
+{{aLatteXDemoFooter}}
+
+</body>
+</html>

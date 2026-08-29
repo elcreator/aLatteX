@@ -1,0 +1,116 @@
+{* =========================================================================
+   aLatteX Demo 5 - document fields, template variables, and $evo
+
+   aLatteX hands Latte the whole document array three times over:
+
+     $pagetitle, $alxTags, ...   every field and TV, spread as bare variables
+     $documentObject             the same thing as an array
+     $evo                        the Evolution CMS core object itself
+
+   A template variable is just another key in that array, so a TV attached to
+   this template is readable as {$alxSubtitle} with no ceremony - and, unlike
+   [*alxSubtitle*], it is readable *as a value*: sliced, counted, compared,
+   passed to a filter.
+   ========================================================================= *}
+<!doctype html>
+<html lang="{evoSetting('manager_language') ?: 'en'}">
+<head>
+    <meta charset="utf-8">
+    <title>{$pagetitle} - aLatteX demo</title>
+</head>
+<body class="alx alx-tvs">
+
+{{aLatteXDemoHeader}}
+
+<section id="fields">
+    <h3>Document fields</h3>
+    <table>
+        <tr><th>id</th><td>{$id}</td></tr>
+        <tr><th>pagetitle</th><td>{$pagetitle}</td></tr>
+        <tr><th>longtitle</th><td>{$longtitle ?: '(empty)'}</td></tr>
+        <tr><th>alias</th><td>{$alias}</td></tr>
+        <tr><th>published</th><td>{$published ? 'yes' : 'no'}</td></tr>
+        <tr><th>menutitle</th><td>{$menutitle ?: $pagetitle}</td></tr>
+    </table>
+
+    <p>
+        The same fields the EVO way, for comparison:
+        [*id*] / [*pagetitle*] / [*alias*]
+    </p>
+</section>
+
+<section id="tvs">
+    <h3>Template variables</h3>
+
+    <h4>alxSubtitle - a plain text TV</h4>
+    <ul>
+        <li>As a Latte variable: {$alxSubtitle}</li>
+        <li>Through the helper: {evoTv('alxSubtitle')}</li>
+        <li>As an EVO tag, resolved after Latte: [*alxSubtitle*]</li>
+        <li>Filtered, which only the first two forms allow: {$alxSubtitle|upper|truncate:24}</li>
+    </ul>
+
+    <h4>alxTags - a multi-value TV</h4>
+    {* Evolution CMS stores checkbox and multi-select values joined with ||.
+       Latte turns that back into an array, which is the whole reason to reach
+       for a template language here. *}
+    {var $tags = ($alxTags|explode:'||')}
+    <p>Raw value: <code>{$alxTags}</code></p>
+    <p>{count($tags)} tags:</p>
+    <ul class="alx-tags">
+        <li n:foreach="$tags as $tag" n:class="alx-tag, $tag === 'latte' ? alx-tag--primary">
+            {$tag|firstUpper}
+        </li>
+    </ul>
+    <p n:if="in_array('latte', $tags, true)">This document is tagged "latte".</p>
+
+    <h4>alxImage - an image TV</h4>
+    {* Guard it: an image TV is empty until someone picks a file. *}
+    {if $alxImage}
+        <img src="{evoSetting('site_url')}{$alxImage}" alt="{$pagetitle}">
+    {else}
+        <p class="alx-empty">No image chosen for this document.</p>
+    {/if}
+
+    <h4>A TV that is not attached to this template</h4>
+    <p>
+        Absent keys are simply missing from the array, so read them
+        defensively: {$alxNotAttached ?? 'not attached to this template'}
+    </p>
+</section>
+
+<section id="documentobject">
+    <h3>$documentObject</h3>
+    <p>Everything above, as one array. Useful for loops and for debugging:</p>
+    <ul>
+        {foreach ['id', 'alias', 'template', 'alxSubtitle', 'alxTags'] as $key}
+            <li><code>{$key}</code>: {$documentObject[$key] ?? '(absent)'}</li>
+        {/foreach}
+    </ul>
+    <p>The document has {count($documentObject)} keys in total.</p>
+</section>
+
+<section id="core">
+    <h3>$evo</h3>
+    <p>
+        The core object is in scope, so anything the CMS can answer during
+        OnLoadWebDocument is available to the template.
+    </p>
+    <ul>
+        <li>Site name: {$evo->getConfig('site_name')}</li>
+        <li>Active parser: {$evo->getConfig('chunk_processor')}</li>
+        <li>Manager language: {$evo->getConfig('manager_language')}</li>
+    </ul>
+    <p>
+        Prefer the helpers - {l}evoSetting('site_name'){r} and friends - where
+        one exists. They read the same values and keep the template working if
+        the core API moves.
+    </p>
+</section>
+
+<main class="alx-content">[*content*]</main>
+
+{{aLatteXDemoFooter}}
+
+</body>
+</html>

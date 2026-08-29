@@ -2,6 +2,8 @@
 
 namespace Elcreator\aLatteX;
 
+use Elcreator\aLatteX\Console\DemoInstallCommand;
+use Elcreator\aLatteX\Console\DemoRemoveCommand;
 use EvolutionCMS\ServiceProvider;
 
 class aLattexServiceProvider extends ServiceProvider
@@ -19,6 +21,24 @@ class aLattexServiceProvider extends ServiceProvider
     {
         $this->registerLatteViewEngine();
         $this->declareTemplateFileEngine();
+        $this->registerCommands();
+    }
+
+    /**
+     * The demo installer, as two artisan commands. Registered only for a
+     * console run: they are development scaffolding, and a web request has no
+     * business being able to rewrite a site's templates.
+     */
+    private function registerCommands(): void
+    {
+        if (!$this->app->runningInConsole()) {
+            return;
+        }
+
+        $this->commands([
+            DemoInstallCommand::class,
+            DemoRemoveCommand::class,
+        ]);
     }
 
     /**

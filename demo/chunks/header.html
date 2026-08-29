@@ -1,0 +1,16 @@
+<!--
+    aLatteXDemoHeader - a plain HTML chunk.
+
+    Only EVO syntax lives here. Evolution CMS parses a chunk *after* Latte has
+    finished, so these tags resolve; Latte syntax in a chunk would not. See
+    aLatteXDemoCard for a chunk that is Latte source instead.
+
+    (An HTML comment, not a Latte {* *} one: nothing in this file ever reaches
+    Latte, so a Latte comment would be printed verbatim.)
+-->
+<header class="alx-header">
+    <p class="alx-eyebrow">[(site_name)] &middot; document #[*id*]</p>
+    <h1>[*pagetitle*]</h1>
+    <p class="alx-subtitle">[*alxSubtitle*]</p>
+    <p class="alx-note">[+alx_note+]</p>
+</header>

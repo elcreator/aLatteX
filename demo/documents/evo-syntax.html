@@ -1,0 +1,63 @@
+<p>
+    Every classic Evolution CMS tag, written verbatim in a Latte template and
+    resolved normally - followed by the same six things done through the Latte
+    functions aLatteX registers, which take expressions instead of literals.
+</p>
+
+<aside class="alx-hint">
+    <h3>Read this page's template</h3>
+    <p>
+        The three sections around this text come from the template
+        <strong>aLatteX Demo: EVO syntax</strong> - <em>Elements &rarr;
+        Templates</em>, category <em>aLatteX demo</em>; in the package it is
+        <code>demo/templates/evo-syntax.latte</code>. Find:
+    </p>
+    <ul>
+        <li>
+            section <code>#passthrough</code> - all six tag forms written
+            straight into a Latte template. They survive because
+            <code>EvoSyntaxBridge</code> swaps each one for a token before
+            Latte reads the file and puts it back afterwards.
+        </li>
+        <li>
+            section <code>#functions</code> - <code>evoChunk()</code>,
+            <code>evoSnippet()</code>, <code>evoUncachedSnippet()</code>,
+            <code>evoTv()</code>, <code>evoSetting()</code> and
+            <code>evoPlaceholder()</code>. These take <em>expressions</em>, so
+            the tag name can be computed - look for the snippet call assembled
+            inside a <code>{foreach}</code>, which the classic syntax cannot do.
+        </li>
+        <li>
+            section <code>#order</code> - which parser runs when, and why a tag
+            produced by a snippet is still resolved while a Latte tag produced
+            by one is not.
+        </li>
+    </ul>
+</aside>
+
+<section class="alx-live">
+    <h3>The same six forms, live in this content field</h3>
+    <p>
+        This text is content, not a template, so Latte never sees it - but the
+        Evolution CMS parser runs over it exactly as it runs over the template's
+        output. Every tag below is doing its job right now:
+    </p>
+    <ul>
+        <li><code>&#91;*pagetitle*&#93;</code> - document field: <strong>[*pagetitle*]</strong></li>
+        <li><code>&#91;*alxSubtitle*&#93;</code> - template variable: <strong>[*alxSubtitle*]</strong></li>
+        <li><code>&#91;(site_name)&#93;</code> - system setting: <strong>[(site_name)]</strong></li>
+        <li><code>&#91;~2~&#93;</code> - document URL: <strong><a href="[~2~]">[~2~]</a></strong></li>
+        <li><code>&#123;&#123;aLatteXDemoBadge&#125;&#125;</code> - chunk: {{aLatteXDemoBadge}}</li>
+        <li><code>&#91;&#91;aLatteXDemoClock&#93;&#93;</code> - cacheable snippet: <strong>[[aLatteXDemoClock]]</strong></li>
+        <li><code>&#91;!aLatteXDemoClock!&#93;</code> - non-cacheable snippet: <strong>[!aLatteXDemoClock!]</strong></li>
+    </ul>
+    <p>
+        With parameters, and setting a placeholder the header chunk prints:
+        [[aLatteXDemoList? &items=`chunk||snippet||setting||placeholder` &note=`Set from the content field of [*pagetitle*].`]]
+    </p>
+    <p>
+        Reload the page twice: only the non-cacheable clock moves. That is the
+        whole difference between the two snippet forms, and it is easier to see
+        here than in any explanation.
+    </p>
+</section>

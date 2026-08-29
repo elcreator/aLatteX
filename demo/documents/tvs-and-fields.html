@@ -1,0 +1,83 @@
+<p>
+    Document fields and template variables arrive in Latte as ordinary
+    variables, which means they can be counted, split, filtered and compared
+    rather than only printed. Three TVs are attached to this template: a text
+    field, a multi-value checkbox, and an image.
+</p>
+
+<aside class="alx-hint">
+    <h3>Read this page's template</h3>
+    <p>
+        The sections around this text come from the template <strong>aLatteX
+        Demo: Fields and TVs</strong> - <em>Elements &rarr; Templates</em>,
+        category <em>aLatteX demo</em>; in the package it is
+        <code>demo/templates/tvs-and-fields.latte</code>. The three TVs are
+        under <em>Elements &rarr; Template Variables</em>:
+        <strong>alxSubtitle</strong>, <strong>alxTags</strong> and
+        <strong>alxImage</strong>. Find:
+    </p>
+    <ul>
+        <li>
+            section <code>#fields</code> - <code>{$pagetitle}</code>,
+            <code>{$id}</code>, <code>{$published}</code> and the rest, used as
+            values: compared, formatted, tested, not merely echoed.
+        </li>
+        <li>
+            section <code>#tvs</code> - <code>alxSubtitle</code> read three
+            ways, and <code>alxTags</code> split with
+            <code>|explode:'||'</code> then looped. A multi-value TV is one
+            string until something splits it, which is the whole reason this
+            page exists.
+        </li>
+        <li>
+            <code>alxImage</code> is deliberately left empty, so the template
+            can show a guarded read rather than printing an empty
+            <code>&lt;img&gt;</code>.
+        </li>
+        <li>
+            section <code>#documentobject</code> - every field at once, and the
+            shape a TV really has inside it: <code>[name, value, display,
+            display_params, type]</code>, not a bare string.
+        </li>
+        <li>
+            section <code>#core</code> - <code>$evo</code>, the core object
+            itself, for the times a template needs to ask the CMS something.
+        </li>
+    </ul>
+</aside>
+
+<section class="alx-live">
+    <h3>The same values, live in this content field</h3>
+    <p>
+        Read here by the Evolution CMS parser rather than by Latte, which is the
+        interesting part: the tag gives you the value and nothing else. Compare
+        each line against what the template does with the same value.
+    </p>
+    <ul>
+        <li>Field: <code>&#91;*pagetitle*&#93;</code> &rarr; <strong>[*pagetitle*]</strong></li>
+        <li>Field: <code>&#91;*id*&#93;</code> &rarr; <strong>[*id*]</strong>, alias <strong>[*alias*]</strong></li>
+        <li>Text TV: <code>&#91;*alxSubtitle*&#93;</code> &rarr; <strong>[*alxSubtitle*]</strong></li>
+        <li>
+            Multi-value TV: <code>&#91;*alxTags*&#93;</code> &rarr;
+            <strong>[*alxTags*]</strong> - the values run together, because a
+            tag hands you the CMS's <em>display</em> rendering of the TV, and a
+            checkbox displays as its ticked values joined with nothing. Latte
+            gets the stored string instead - look for <code>Raw value:</code>
+            above, which prints <code>evo||demo||raw</code> from the same TV,
+            and then splits it with <code>|explode:'||'</code>. Same value,
+            two different things arriving.
+        </li>
+        <li>
+            Image TV, empty: <code>&#91;*alxImage*&#93;</code> &rarr;
+            "<strong>[*alxImage*]</strong>". Nothing between the quotes, and no
+            way to guard against it from a tag - the template can, with
+            <code>n:if</code>.
+        </li>
+        <li>Setting: <code>&#91;(site_name)&#93;</code> &rarr; <strong>[(site_name)]</strong></li>
+    </ul>
+    <p>
+        Try it: edit this document, put something in <em>Demo image</em>, save,
+        and watch the empty line above fill in while the template's guarded
+        version starts showing its <code>&lt;figure&gt;</code>.
+    </p>
+</section>

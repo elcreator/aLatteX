@@ -1,0 +1,67 @@
+{* =========================================================================
+   aLatteX Demo 0 - the index page
+
+   A realistic page rather than a catalogue: one layout, defined once with
+   {define}, filled per section. This is the shape most aLatteX templates end
+   up in - Latte owns the structure, Evolution CMS owns the content.
+   ========================================================================= *}
+{var $pages = [
+    ['alias' => 'alattex-basics',    'title' => 'Latte basics',            'note' => 'Every tag, filter and n:attribute, rendered.'],
+    ['alias' => 'alattex-evo',       'title' => 'EVO syntax',              'note' => 'The six classic tags, and their Latte equivalents.'],
+    ['alias' => 'alattex-chunks',    'title' => 'Chunks and snippets',     'note' => 'Why Latte in a chunk prints literally, and what to do.'],
+    ['alias' => 'alattex-raw',       'title' => 'Raw output',              'note' => 'Printing braces, syntax off, escaping, and the two brace traps.'],
+    ['alias' => 'alattex-tvs',       'title' => 'Fields and TVs',          'note' => 'Document fields, template variables, $evo.'],
+]}
+
+{define layout, string $title, array $pages}
+    <!doctype html>
+    <html lang="{evoSetting('manager_language') ?: 'en'}">
+    <head>
+        <meta charset="utf-8">
+        <title>{$title} - {evoSetting('site_name')}</title>
+    </head>
+    <body class="alx alx-home">
+        {include content, pages: $pages}
+        {{aLatteXDemoFooter}}
+    </body>
+    </html>
+{/define}
+
+{define content, array $pages}
+    {{aLatteXDemoHeader}}
+
+    <main class="alx-content">
+        [*content*]
+
+        <h3>The demo pages</h3>
+        <ul class="alx-index">
+            {* Ask the CMS for the URL rather than assembling one. makeUrl()
+               honours friendly_urls, use_alias_path and the URL suffix, so the
+               link is right whatever the site is configured for - a hardcoded
+               "alias.html" is only right for one of those configurations. *}
+            {foreach $pages as $page}
+                {var $pageId = $evo->getIdFromAlias($page['alias'])}
+                <li>
+                    {if $pageId}
+                        <a href="{$evo->makeUrl($pageId)}">{$page['title']}</a>
+                    {else}
+                        <span class="alx-missing">{$page['title']}</span>
+                    {/if}
+                    - {$page['note']}
+                </li>
+            {/foreach}
+        </ul>
+
+        <h3>Built by a snippet, through a chunk</h3>
+        {{aLatteXDemoNav}}
+
+        <h3>Built in Latte, from the same list</h3>
+        {evoSnippet('aLatteXDemoList', [
+            'items' => implode('||', array_column($pages, 'title')),
+            'class' => 'alx-index-from-latte',
+            'note'  => 'This page was assembled by ' . evoSetting('chunk_processor') . '.',
+        ])}
+    </main>
+{/define}
+
+{include layout, title: $pagetitle, pages: $pages}

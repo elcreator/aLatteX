@@ -25,7 +25,14 @@
     }
   },
   "scripts": {
-    "test": "pest --no-coverage"
+    "test": "pest --no-coverage",
+    "demo:install": "@php bin/alattex-demo.php install",
+    "demo:remove": "@php bin/alattex-demo.php remove"
+  },
+  "scripts-descriptions": {
+    "test": "Run the unit and integration suite.",
+    "demo:install": "Install the demo pages, templates, chunks, snippets and TVs into the surrounding Evolution CMS site.",
+    "demo:remove": "Delete everything demo:install created."
   },
   "extra": {
     "laravel": {

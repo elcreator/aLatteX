@@ -1,0 +1,65 @@
+<p>
+    Six pages, one template each, installed by <code>composer demo:install</code>.
+    Together they exercise every construct aLatteX can be asked to render:
+    Latte 3 in full, all six Evolution CMS tag forms, the helper functions this
+    plugin registers, and the places where the two syntaxes rub against each
+    other.
+</p>
+<p>
+    Everything here is ordinary content. Open <em>Elements &rarr; Templates</em>
+    and read the template beside the page it produced - that is what the demo
+    is for. When you are done, <code>composer demo:remove</code> takes all of
+    it away again.
+</p>
+
+<aside class="alx-hint">
+    <h3>Read this page's template</h3>
+    <p>
+        Everything around this paragraph comes from the template
+        <strong>aLatteX Demo: Home</strong> - <em>Elements &rarr; Templates</em>,
+        category <em>aLatteX demo</em>; in the package it is
+        <code>demo/templates/home.latte</code>. Open it beside this page and
+        find:
+    </p>
+    <ul>
+        <li>
+            <code>{define layout, string $title, array $pages}</code> - the
+            whole page shell as one reusable block, called once from
+            <code>{include layout, title: ..., pages: $pages}</code>.
+        </li>
+        <li>
+            <code>{define content, array $pages}</code> - the middle of the
+            page, which is where <code>&#91;*content*&#93;</code> sits and so
+            where this text is pasted in.
+        </li>
+        <li>
+            <em>Built in Latte, from the same list</em> and <em>Built by a
+            snippet, through a chunk</em> - the same index rendered twice, once
+            by a <code>{foreach}</code> and once by
+            <code>aLatteXDemoList</code>. Two routes, one result: that is the
+            comparison the page exists to make.
+        </li>
+    </ul>
+</aside>
+
+<section class="alx-live">
+    <h3>Live in this content field</h3>
+    <p>
+        A resource's content is not a Latte template - Latte renders the
+        template and finishes before <code>&#91;*content*&#93;</code> is
+        substituted. Evolution CMS parses this text afterwards, so EVO tags
+        written here do run. These are real, not screenshots:
+    </p>
+    <ul>
+        <li>Document field: <strong>[*pagetitle*]</strong>, id [*id*].</li>
+        <li>System setting: <strong>[(site_name)]</strong>.</li>
+        <li>Chunk: {{aLatteXDemoBadge}}</li>
+        <li>Snippet with parameters: [[aLatteXDemoList? &items=`templates||chunks||snippets` &class=`alx-list`]]</li>
+        <li>Link built from a document id: <a href="[~3~]">the basics page</a>.</li>
+    </ul>
+    <p>
+        A Latte tag typed here stays text - <code>{$pagetitle}</code> prints as
+        {$pagetitle}, because nothing compiles this field. The <em>Latte
+        basics</em> page shows that side by side.
+    </p>
+</section>

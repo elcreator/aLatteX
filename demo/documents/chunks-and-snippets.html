@@ -1,0 +1,71 @@
+<p>
+    Latte processes the template and stops. Chunks and snippets are expanded
+    afterwards by Evolution CMS, which does not call Latte again - so a chunk
+    full of <code>&#123;$vars&#125;</code> prints them as text. This page shows
+    the three ways round that.
+</p>
+
+<aside class="alx-hint">
+    <h3>Read this page's template</h3>
+    <p>
+        The numbered sections come from the template <strong>aLatteX Demo:
+        Chunks and snippets</strong> - <em>Elements &rarr; Templates</em>,
+        category <em>aLatteX demo</em>; in the package it is
+        <code>demo/templates/chunks-and-snippets.latte</code>. Read it together
+        with the chunk <strong>aLatteXDemoCard</strong> (<em>Elements &rarr;
+        Chunks</em>), which is Latte source rather than finished HTML. Find:
+    </p>
+    <ul>
+        <li>
+            section <code>#literal</code> - the same chunk pulled in twice,
+            once with the EVO tag and once with <code>evoChunk()</code>. Both
+            print its braces verbatim: <code>evoChunk()</code> runs during
+            Latte's pass but only <em>returns</em> the chunk, it does not
+            compile it.
+        </li>
+        <li>
+            section <code>#rendered</code> - <code>aLatteXDemoLatte</code> with
+            <code>&amp;chunk</code> and a <code>&amp;vars</code> JSON object: a
+            second, deliberate Latte pass started from PHP. Also the
+            <code>&amp;code</code> form, which compiles an inline string.
+        </li>
+        <li>
+            section <code>#inverted</code> - usually the better answer. The
+            <code>{foreach}</code> stays in the template and the chunk stays a
+            lump of markup with placeholders.
+        </li>
+        <li>
+            section <code>#snippet-output</code> - a snippet's return value is
+            spliced in after Latte, so EVO tags in it resolve and Latte tags in
+            it do not.
+        </li>
+    </ul>
+</aside>
+
+<section class="alx-live">
+    <h3>Both routes, live in this content field</h3>
+    <p>
+        Content is parsed by Evolution CMS only, which makes it the cleanest
+        place to see the difference: the two lines below pull the <em>same</em>
+        chunk, and only one of them renders it.
+    </p>
+
+    <h4>Included the ordinary way - Latte source arrives as text</h4>
+    <pre class="alx-literal">{{aLatteXDemoCard}}</pre>
+
+    <h4>Through aLatteXDemoLatte - compiled by a second pass</h4>
+    [[aLatteXDemoLatte?
+        &chunk=`aLatteXDemoCard`
+        &vars=`{"title":"Rendered from the content field","body":"Same chunk as above. This copy went through the plugin engine a second time, started by a snippet.","tags":["content","chunk","second pass"]}`
+    ]]
+
+    <h4>Inline Latte, no chunk involved</h4>
+    [[aLatteXDemoLatte? &code=`<p>Document {$id}: {$pagetitle|upper}</p>` &vars=`{}`]]
+
+    <p>
+        The last one is worth a second look: <code>{$pagetitle|upper}</code>
+        typed directly into this field would print as text, but handed to
+        <code>aLatteXDemoLatte</code> as <code>&amp;code</code> it compiles.
+        Nothing about the field changed - what changed is who read the string.
+    </p>
+</section>
