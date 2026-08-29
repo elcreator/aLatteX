@@ -141,6 +141,7 @@ final class FakeEvolutionCore
         private array $config = [],
         private array $chunks = [],
         public array $placeholders = [],
+        private array $documents = [],
     ) {
     }
 
@@ -170,6 +171,21 @@ final class FakeEvolutionCore
     public function getChunk(string $name): string
     {
         return $this->chunks[$name] ?? '';
+    }
+
+    /**
+     * The two URL helpers a template needs to link to another document without
+     * assuming how the site spells its URLs. Answered from $documents, keyed by
+     * alias, so a template asking for a link gets one.
+     */
+    public function getIdFromAlias(string $alias): int
+    {
+        return $this->documents[$alias] ?? 0;
+    }
+
+    public function makeUrl(int $id, string $alias = '', string $args = '', string $scheme = ''): string
+    {
+        return '/index.php?id=' . $id . ($args !== '' ? '&' . ltrim($args, '&') : '');
     }
 }
 
@@ -224,17 +240,20 @@ if (!function_exists('evo')) {
  * @param array<string, mixed> $config
  * @param array<string, string> $chunks
  * @param array<string, string> $placeholders
+ * @param array<string, int> $documents alias => id
  */
 function useFakeEvo(
     array $documentObject = [],
     array $config = [],
     array $chunks = [],
     array $placeholders = [],
+    array $documents = [],
 ): FakeEvolutionCore {
     return $GLOBALS['evo'] = new FakeEvolutionCore(
         $documentObject,
         $config,
         $chunks,
         $placeholders,
+        $documents,
     );
 }

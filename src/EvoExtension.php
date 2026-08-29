@@ -50,7 +50,7 @@ class EvoExtension extends Extension
      */
     public function snippet(string $name, array $params = []): Html
     {
-        return new Html('[[' . $name . $this->buildParamString($params) . ']]');
+        return new Html('[[' . $this->assertName($name) . $this->buildParamString($params) . ']]');
     }
 
     /**
@@ -60,13 +60,18 @@ class EvoExtension extends Extension
      */
     public function uncachedSnippet(string $name, array $params = []): Html
     {
-        return new Html('[!' . $name . $this->buildParamString($params) . '!]');
+        return new Html('[!' . $this->assertName($name) . $this->buildParamString($params) . '!]');
     }
 
-    /** Return a raw template variable / document field value. */
+    /**
+     * Return a raw template variable / document field value.
+     *
+     * A TV sits in documentObject as [name, value, display, display_params,
+     * type], so the value has to be picked out of it - see DocumentObject.
+     */
     public function tv(string $name): string
     {
-        return (string) (evo()->documentObject[$name] ?? '');
+        return (string) DocumentObject::value($name, evo()->documentObject[$name] ?? '');
     }
 
     /** Return a system configuration setting value. */
@@ -83,13 +88,55 @@ class EvoExtension extends Extension
 
     // -------------------------------------------------------------------------
 
-    /** @param array<string, string> $params */
+    /**
+     * Refuse a name that is not an element name.
+     *
+     * These helpers emit EVO syntax as raw Html, so a name assembled from a
+     * request value could otherwise carry the rest of a tag with it.
+     */
+    private function assertName(string $name): string
+    {
+        if (!EvoSyntaxBridge::isElementName($name)) {
+            throw new \InvalidArgumentException(
+                'aLatteX: "' . $name . '" is not a valid Evolution CMS element name.'
+            );
+        }
+
+        return $name;
+    }
+
+    /**
+     * Build `?&key=`value`` pairs, with the tag delimiters removed.
+     *
+     * EVO delimits a parameter value with backticks and has no escape for
+     * one, so a value containing a backtick ends the value early and the rest
+     * of it is parsed as tag syntax: `['id' => '`]] [[Other']` would close the
+     * call and open another. Since the result is returned as Html and reaches
+     * the CMS parser unescaped, the delimiters are stripped rather than
+     * trusted - both the backtick and the sequences that open or close a tag.
+     *
+     * Parameter *names* go through the element-name test for the same reason.
+     *
+     * @param array<string, string> $params
+     */
     private function buildParamString(array $params): string
     {
         $out = '';
+
         foreach ($params as $key => $value) {
-            $out .= '&' . $key . '=`' . $value . '`';
+            $out .= '&' . $this->assertName((string) $key) . '=`' . self::sanitiseValue((string) $value) . '`';
         }
+
         return $out ? '?' . $out : '';
+    }
+
+    /** Remove everything that could end the value or start another tag. */
+    private static function sanitiseValue(string $value): string
+    {
+        return str_replace(
+            ['`', '[[', ']]', '[!', '!]', '{{', '}}'],
+            '',
+            $value,
+        );
     }
 }

@@ -64,11 +64,16 @@ class LattexEngine
 
         // 2. Build Latte params: spread document fields as top-level variables
         //    plus keep $evo and $documentObject for structured access.
+        //    Template variables arrive from the core as [name, value, display,
+        //    display_params, type]; DocumentObject::flatten() reduces each to
+        //    its value, so {$alxSubtitle} means what [*alxSubtitle*] means.
+        $fields = DocumentObject::flatten($documentObject);
+
         $params = array_merge(
-            $documentObject,
+            $fields,
             [
                 'evo'            => evo(),
-                'documentObject' => $documentObject,
+                'documentObject' => $fields,
             ]
         );
 
@@ -105,13 +110,16 @@ class LattexEngine
         }
 
         // Document fields stay available as bare variables, the same way they
-        // are in a template held in the database.
+        // are in a template held in the database - TVs flattened to their
+        // values just the same.
+        $fields = DocumentObject::flatten($documentObject);
+
         $params = array_merge(
-            $documentObject,
+            $fields,
             $data,
             [
                 'evo' => evo(),
-                'documentObject' => $documentObject,
+                'documentObject' => $fields,
             ]
         );
 

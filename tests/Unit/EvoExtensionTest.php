@@ -61,3 +61,58 @@ test('data helpers return plain strings so Latte can escape normal values', func
     assertSame('Example & Co', $extension->setting('site_name'));
     assertSame('<strong>Saved</strong>', $extension->placeholder('notice'));
 });
+
+/**
+ * Snippet helpers return raw Html and their output reaches the CMS parser
+ * unescaped, so an untrusted parameter value must not be able to end the value
+ * and start a tag of its own. EVO delimits values with backticks and has no
+ * escape for one, so the delimiters are removed.
+ */
+test('snippet parameters cannot break out of the tag they are written into', function (): void {
+    useFakeEvo();
+
+    $extension = new Elcreator\aLatteX\EvoExtension();
+
+    // The injected call is gone; the trailing `]] is this tag's own terminator.
+    assertSame(
+        '[[X?&a=` Evil`]]',
+        (string) $extension->snippet('X', ['a' => '`]] [[Evil']),
+    );
+
+    $out = (string) $extension->snippet('X', ['a' => '`&b=`injected']);
+    assertSame('[[X?&a=`&b=injected`]]', $out);
+
+    $out = (string) $extension->uncachedSnippet('X', ['a' => '!] [!Evil']);
+    assertStringNotContains('[!Evil', $out);
+
+    // Values that are merely awkward, not dangerous, are left intact - the
+    // @CODE templates snippets are normally given depend on it.
+    assertSame(
+        '[[DocLister?&tpl=`@CODE:<li>[+pagetitle+]</li>`]]',
+        (string) $extension->snippet('DocLister', ['tpl' => '@CODE:<li>[+pagetitle+]</li>']),
+    );
+});
+
+test('snippet and parameter names are rejected when they are not names', function (): void {
+    useFakeEvo();
+
+    $extension = new Elcreator\aLatteX\EvoExtension();
+
+    foreach (['X]] [[Evil', '1abc', 'a b', ''] as $name) {
+        $threw = false;
+        try {
+            $extension->snippet($name);
+        } catch (\InvalidArgumentException) {
+            $threw = true;
+        }
+        assertSame(true, $threw, "should have been refused: {$name}");
+    }
+
+    $threw = false;
+    try {
+        $extension->snippet('X', ['a]] [[Evil' => '1']);
+    } catch (\InvalidArgumentException) {
+        $threw = true;
+    }
+    assertSame(true, $threw, 'a parameter name should be refused too');
+});
