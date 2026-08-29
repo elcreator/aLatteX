@@ -155,8 +155,15 @@ Any tag that wraps content has an `n:` form that lives on the element instead:
 
 ## Blocks
 
-Blocks are local to the template, which is exactly what a CMS template needs -
-there is no filesystem to inherit from.
+Blocks are local to the template. There is no cross-template inheritance:
+`{extends}`, `{layout}` and `{include 'other.latte'}` have nothing to resolve
+against, because aLatteX renders through Latte's `StringLoader` - it hands the
+engine the template's source, not a path. That is true of a file template as
+well as a database one: `views/<alias>.latte` is read and rendered as a string,
+so putting a template in a file buys version control, not `{extends}`.
+
+`{define}` and `{include name}` within one template cover what a CMS template
+usually wants from inheritance, and a shared fragment is what chunks are for.
 
 ```latte
 {define layout, string $title, array $pages}

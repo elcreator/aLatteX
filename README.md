@@ -2,7 +2,7 @@
 
 **A Latte eXtended template parser for Evolution CMS.**
 
-Adds [Latte 3.x](https://latte.nette.org) as a third template-parser option alongside the built-in *DocumentParser* and *DLTemplate*. Templates are created and edited directly in the CMS admin panel, saved to the database, compiled to PHP by Latte, and cached — no filesystem template files required.
+Adds [Latte 3.x](https://latte.nette.org) as a third template-parser option alongside the built-in *DocumentParser* and *DLTemplate*. Templates are compiled to PHP by Latte and cached, and they can live wherever suits the project: written in the admin panel and stored in the database, or kept in `views/<alias>.latte` as files under version control. The manager's *Template code* switch chooses per template, and aLatteX registers itself as one of the engines it can create a file for.
 
 All existing Evolution CMS template syntax is fully supported alongside Latte syntax in the same template.
 
@@ -120,7 +120,7 @@ Important caveats:
 
 ### Caching
 
-Latte compiles each template to a PHP file stored in `storage/framework/cache/latte/`. The cache key is derived from the template content, so the compiled cache automatically invalidates whenever a template is saved in the admin panel.
+Latte compiles each template to a PHP file stored in `storage/framework/cache/latte/`. The cache key is derived from the template content itself, so the compiled cache invalidates as soon as the template changes - whether it was saved in the admin panel or edited as a file.
 
 Evolution CMS page-level caching (`enable_cache`) works as normal on top of this.
 
@@ -128,7 +128,21 @@ Evolution CMS page-level caching (`enable_cache`) works as normal on top of this
 
 ## Writing templates
 
-Templates are written in the admin panel (*Elements → Templates*) using standard Latte syntax. EVO tags can appear anywhere alongside Latte tags.
+Templates are written in the admin panel (*Elements → Templates*), or in a file, using standard Latte syntax. EVO tags can appear anywhere alongside Latte tags.
+
+### In the database, or in a file
+
+The template form's **Template code** switch has three settings:
+
+| Setting | Where the code lives |
+|---|---|
+| *In the database* | the `site_templates` row, edited in the manager |
+| *In a file* | `views/<templatealias>.latte`, edited wherever you edit code |
+| *Automatic* | the file if one matches the alias, the database otherwise (the default) |
+
+Choosing *In a file* with **Latte (.latte)** scaffolds the file and hands rendering to this plugin's view engine. Both routes go through the same pipeline — EVO tags are protected, Latte runs, tags are restored — so a template behaves identically whichever side of the switch it is on, and moving one across is a copy and paste.
+
+The switch and the engine dropdown need Evolution CMS 3.5.9 or newer. On older cores a template whose alias matches `views/<alias>.latte` is still rendered from that file — the CMS has always preferred a matching view — there is simply no UI for creating one.
 
 ### Available variables
 
