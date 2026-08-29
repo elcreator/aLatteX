@@ -16,13 +16,27 @@ Key constraint: **no core Evolution CMS files are modified**. All integration is
 
 ```
 composer.json              Package manifest (type: evolutioncms-plugin)
+bin/
+  alattex-demo.php         composer demo:install / demo:remove → finds artisan, shells out
+demo/
+  manifest.php             The demo set as data: names, relationships, metadata
+  chunks/ snippets/ templates/ documents/   One file per element body
+docs/                      User- and agent-facing syntax reference
 plugins/
-  aLattexPlugin.php        Two Event::listen calls — the only runtime entry points
+  aLattexPlugin.php        Three Event::listen calls — the only runtime entry points
 src/
   aLattexServiceProvider.php  Extends EvolutionCMS\ServiceProvider
   LattexEngine.php            Wraps Latte\Engine; owns the render pipeline
+  LatteViewEngine.php         Illuminate view Engine for views/<alias>.latte
   EvoSyntaxBridge.php         Regex-based protect/restore for EVO tag syntax
+  TokenSecret.php             The plugin's own key, behind the token HMAC
+  DocumentObject.php          Flattens documentObject: a TV is [name, value, ...]
+  ManagerEditor.php           CodeMirror on the Resource content field, EVO-tag mode
   EvoExtension.php            Latte\Extension subclass; adds evo* functions
+  Console/                    DemoInstallCommand, DemoRemoveCommand (console only)
+  Demo/
+    DemoContent.php           Loads demo/ into arrays. No models, no container, no evo()
+    DemoSeeder.php            install()/remove() against the CMS database
 vendor/                    Managed by Composer — never edit
 tmp/                       Reference Evolution CMS packages — never modify
 ```
@@ -45,7 +59,13 @@ OnLoadWebDocument event
 
 ### Admin panel injection
 
-`OnManagerMainFrameHeaderHTMLBlock` fires on every manager page render. The handler checks `$_GET['a'] === '17'` (system settings page) and returns a `<script>` that clones the "DLTemplate" radio button, relabels it "aLatteX", and appends it to the `chunk_processor` group. No Blade views are overridden.
+Two handlers, both returning a `<script>` and neither overriding a Blade view.
+
+`OnSiteSettingsRender` fires while the system-settings page is built; its output is printed inside the Site tab (`system_settings/general.blade.php`), below the fields. The handler clones the "DLTemplate" radio, relabels it "aLatteX" and appends it to the `chunk_processor` group. The event matters: it renders *after* the radios and *before* the page's own script, so the option exists by the time the CMS calls `setChangesChunkProcessor()`. From the manager header — where this used to live — the injection could only run at `DOMContentLoaded`, by which point that call had already thrown on a `null` `:checked` lookup, since none of the two options the CMS renders is the stored `aLatteX`.
+
+`OnDocFormRender` fires while the document form is built, and its output lands inside the form below the content textarea. The handler hands over to `src/ManagerEditor.php`, which puts CodeMirror on the field with an EVO-tag overlay on `htmlmixed`. Evolution leaves that one field bare: the CodeMirror plugin only initialises when `$rte === 'none'`, and a stock install has `use_editor = 1` with `which_editor = 'TinyMCE4'` (`core/factory/settings.php`) while no rich-text editor is in the base install set — so `$rte` names an editor that is not there, CodeMirror stays out, and nothing else steps in. It stands down when `myCodeMirrors['ta']` already exists, when the page renders a `which_editor` picker set to a real editor, and when the CMS ships no CodeMirror assets to load.
+
+**It highlights EVO tags only, and that is deliberate.** Latte renders the *template* at `OnLoadWebDocument`; `[*content*]` is substituted afterwards by EVO's parser pass, so a document's content field arrives as data. Verified on a real site: content `LATTE[{$pagetitle}] EVO[[*pagetitle*]]` renders as `LATTE[{$pagetitle}] EVO[aLatteX probe]`. Colouring Latte in that field would advertise a feature the pipeline does not have. The template editor is where Latte is live, and it is still highlighted by the core's EVO-only MODx mode — a Latte-aware mode there would be a real improvement and is not done.
 
 ### Activation
 
@@ -62,6 +82,31 @@ The plugin is active when `chunk_processor` system setting equals `'aLatteX'`. T
 - `invokeEvent()` collects all non-null listener return values into an array. Return `''` (empty string) to opt out — do **not** return `null`.
 - **Action IDs**: system settings page = `17`, save settings = `30`.
 - **`$_GET['a']`** is the canonical way to read the current manager action.
+- **`documentObject` is not flat.** Document fields are scalars, but
+  `Core::getDocumentObject()` merges each TV in as
+  `[name, value, display, display_params, type]`. The EVO parser reads
+  `$value[1]`; so must anything else. `src/DocumentObject.php` does it for the
+  template variables and for `evoTv()`. A fixture that puts a plain string
+  under a TV name is testing a shape the CMS never produces — which is exactly
+  how `{$alxSubtitle|upper}` once reached a live page as `Array`.
+
+### Verifying against a real CMS
+
+The unit suite runs without a site, which is what let the `documentObject`
+shape bug through. `ci/compose-evo.sh` builds a real one on sqlite, and it is
+worth doing for anything that touches the render pipeline or the demo:
+
+```sh
+ci/compose-evo.sh /tmp/evo --evo-src ../../evolution --dev --install
+ci/run-tests.sh /tmp/evo
+cd /tmp/evo && php core/artisan alattex:demo:install --force
+```
+
+Then set `chunk_processor` to `aLatteX`, delete
+`core/storage/bootstrap/siteCache.idx.php`, serve the tree and read the pages.
+Latte errors do not surface in the output — the plugin logs them and leaves the
+document unrendered — so check `evo_event_log` when a page comes back as raw
+template source.
 
 ### EVO template syntax reference
 
@@ -93,12 +138,16 @@ Snippet parameters: `[[name?&key=\`value\`&key2=\`value2\`]]`
 | Task | File(s) to edit |
 |---|---|
 | Add a new EVO-style helper function in Latte | `src/EvoExtension.php` → `getFunctions()` |
-| Support an additional EVO tag syntax pattern | `src/EvoSyntaxBridge.php` → `PATTERNS` constant |
+| Support an additional EVO tag syntax pattern | `src/EvoSyntaxBridge.php` → `DELIMITERS` constant (and `NAME_START`/`NAME_REST` if the name grammar changes) |
 | Change the Latte cache location | `src/LattexEngine.php` → `resolveCacheDir()` |
 | Add/remove Latte variables available in templates | `src/LattexEngine.php` → `render()`, `$params` array |
-| Change which admin page the radio is injected on | `plugins/aLattexPlugin.php` → action check |
+| Change where the chunk_processor radio is injected | `plugins/aLattexPlugin.php` → the `OnSiteSettingsRender` listener |
+| Change the Resource content editor (mode, theme, options) | `src/ManagerEditor.php` |
 | Add Latte filters or tags | `src/EvoExtension.php` → `getFilters()` / `getTags()` |
 | Register routes, migrations, or views | `src/aLattexServiceProvider.php` → `boot()` |
+| Add or change a demo page/element | `demo/manifest.php` plus the file it names |
+| Change how the demo is written to the DB | `src/Demo/DemoSeeder.php` |
+| Document a syntax rule for users and agents | `docs/` — and add it to the demo, so it is tested |
 
 ---
 
@@ -109,8 +158,41 @@ Snippet parameters: `[[name?&key=\`value\`&key2=\`value2\`]]`
 - Do not add a second `protect()`/`restore()` cycle; `EvoSyntaxBridge` is stateful per render call and must not be reused across requests (it is instantiated inside `LattexEngine` which is a singleton — the token map is reset at the start of each `protect()` call, which is correct).
 - Do not override core Blade views to inject the admin panel option; use the JS injection approach already in place.
 - Do not return `null` from event listeners — return `''` to produce no output.
+- Do not make the bridge's token prefix predictable, and do not derive it from
+  anything random per request. It must be unguessable (a guessable token lets a
+  rendered value become live EVO syntax — demonstrated executing on a live site)
+  **and** stable per template (Latte's cache id is the protected string, so a
+  changing prefix recompiles every template on every request). The HMAC in
+  `EvoSyntaxBridge::protect()` is what satisfies both.
+- Do not put the token key in `system_settings`: any template could print it as
+  `[(setting)]`. It lives in `storage/alattex/token.key`.
+- Do not reuse the application key for it. Only this plugin's key should be
+  exposed, however indirectly, by a truncated HMAC in a compiled template.
+- Do not interpolate untrusted values into EVO tag syntax without going through
+  `EvoExtension::sanitiseValue()` / `EvoSyntaxBridge::isElementName()`.
 
 ---
+
+## The demo set is also the fixture set
+
+`demo/` serves two audiences at once, and both must keep working:
+
+- **Humans.** `composer demo:install` writes it into a site; `composer
+  demo:remove` takes it out. Both are idempotent and match elements by name —
+  never by prefix or wildcard, so an element a user renamed is never swept up.
+- **CI.** `tests/Integration/DemoContentTest.php` renders every demo template
+  through `LattexEngine` against the stub core in `tests/bootstrap.php`.
+
+That is why `DemoContent` is free of models, of the container and of `evo()`:
+the moment it needs a CMS, the tests need one too. Keep the database in
+`DemoSeeder` and nowhere else.
+
+A syntax claim in `docs/` should have a line in a demo template that
+demonstrates it and an assertion in `DemoContentTest` that pins it. When adding
+Latte constructs to a demo template, render them before committing — several
+plausible-looking forms do not compile (`{sep}` outside `{foreach}`, a filter
+before `as` in `n:foreach`, a filter in `{var}` without parentheses, `{'x'|f}`
+where the brace is followed by a quote).
 
 ## Testing checklist
 

@@ -1,6 +1,7 @@
 <?php
 
 use Elcreator\aLatteX\LattexEngine;
+use Elcreator\aLatteX\ManagerEditor;
 
 // ---------------------------------------------------------------------------
 // Front-end: process templates through Latte when aLatteX is selected
@@ -64,18 +65,28 @@ Event::listen('evolution.OnLoadWebDocument', function (): void {
 // ---------------------------------------------------------------------------
 
 /**
- * OnManagerMainFrameHeaderHTMLBlock fires on every manager page render.
- * We return a small <script> only when on the system-settings page (action 17).
- * The script adds an "aLatteX" radio button after "DLTemplate".
+ * OnSiteSettingsRender fires while the system-settings page is being built and
+ * its return value is printed inside the Site tab, below the fields - after the
+ * chunk_processor radios and before the page's own <script>. Both halves of
+ * that matter:
+ *
+ *   - the radios already exist, so the option can be added synchronously
+ *     rather than waiting for DOMContentLoaded, and
+ *   - the CMS's setChangesChunkProcessor() has not run yet.
+ *
+ * That second point is the whole reason this is not in the manager header.
+ * From the header the script can only run at DOMContentLoaded, which is after
+ * the CMS's own inline call - and with aLatteX stored, none of the two options
+ * the CMS renders is checked, so its
+ *
+ *     item = item || document.querySelector('[name="chunk_processor"]:checked')
+ *
+ * yields null and the next line throws "Cannot read properties of null
+ * (reading 'checked')" on every visit to the settings page. Injecting the
+ * checked option before that call runs means there is something to find.
  */
-Event::listen('evolution.OnManagerMainFrameHeaderHTMLBlock', function (): string {
+Event::listen('evolution.OnSiteSettingsRender', function (): string {
     $evo = evo();
-
-    // Only act on the system-settings page (action 17 = "Editing settings")
-    $action = (string) ($_GET['a'] ?? $_POST['a'] ?? '');
-    if ($action !== '17') {
-        return '';
-    }
 
     // json_encode, not htmlspecialchars: this lands in a JavaScript string
     // literal, not in markup.
@@ -153,19 +164,15 @@ Event::listen('evolution.OnManagerMainFrameHeaderHTMLBlock', function (): string
         // Insert as its own row, right after the last existing one.
         wrapper.parentNode.insertBefore(newWrapper, wrapper.nextSibling);
 
-        // Re-attach the CMS change handler (defined in system_settings.blade.php)
-        newInput.addEventListener('change', function () {
-            if (typeof setChangesChunkProcessor === 'function') {
-                setChangesChunkProcessor(this);
-            }
-        });
-
-        // The CMS runs setChangesChunkProcessor() once while parsing the page,
-        // before this option exists. With aLatteX stored, none of the options it
-        // can see is checked, so that first call decided the state of
-        // enable_filter / enable_at_syntax from nothing. Now that the checked
-        // option is in the DOM, let it decide again.
+        // Normally this script runs before system_settings.blade.php's, which
+        // then binds its change handler to every chunk_processor radio, this
+        // one included, and calls setChangesChunkProcessor() itself. Only if
+        // that has already happened - a reordered or cached page - is there
+        // anything left to do here.
         if (typeof setChangesChunkProcessor === 'function') {
+            newInput.addEventListener('change', function () {
+                setChangesChunkProcessor(this);
+            });
             try {
                 setChangesChunkProcessor(isCurrent ? newInput : undefined);
             } catch (e) {
@@ -174,12 +181,32 @@ Event::listen('evolution.OnManagerMainFrameHeaderHTMLBlock', function (): string
         }
     }
 
+    // The radios are above this script in the document, so there is no reason
+    // to wait - and every reason not to: the CMS reads the checked option
+    // before DOMContentLoaded. The listener is the fallback for a manager
+    // theme that prints the tab events somewhere else.
+    injectALatteXOption();
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', injectALatteXOption);
-    } else {
-        injectALatteXOption();
     }
 }());
 </script>
 HTML;
+});
+
+// ---------------------------------------------------------------------------
+// Admin panel: highlight the Resource content field
+// ---------------------------------------------------------------------------
+
+/**
+ * OnDocFormRender fires while the document form is being written, and its
+ * return value is printed inside the form, below the content textarea.
+ *
+ * Evolution CMS leaves that one field unhighlighted while templates, chunks and
+ * snippets all get CodeMirror - see ManagerEditor for why. With aLatteX as the
+ * chunk processor the field holds template source, so it gets the same editor,
+ * with a mode that knows Latte tags as well as EVO ones.
+ */
+Event::listen('evolution.OnDocFormRender', function (): string {
+    return ManagerEditor::documentEditorScript();
 });
