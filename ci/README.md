@@ -18,6 +18,25 @@ docker compose -f ci/compose.yaml run --rm build    # zip into ./dist
 docker compose -f ci/compose.yaml up serve          # CMS on http://localhost:8080
 ```
 
+`serve` gives you a real manager to click through. Two things about it:
+
+* **Friendly URLs are switched off** in the served build. `php -S` has no
+  rewrite engine, and the CMS cannot be routed around it: `Core.php` picks
+  between the alias and id lookup with `filter_input(INPUT_GET, 'q')`, which
+  reads the SAPI's original request and ignores anything a router script writes
+  into `$_GET` or `QUERY_STRING`. Left on, every pretty URL would answer with
+  the site start page. With them off the CMS emits `index.php?id=N` links and
+  the site is navigable. The shipped images run apache/nginx/frankenphp with
+  the real rewrite rules and are unaffected.
+* **The demo is not installed for you.** Once the site is up:
+
+  ```sh
+  docker compose -f ci/compose.yaml exec serve php /build/core/artisan alattex:demo:install --force
+  ```
+
+  Then set *Chunk processor* to **aLatteX** in System Settings, or the pages
+  will be rendered by the default parser.
+
 By default the CMS is taken from the checkout at `../../evolution` — the layout
 these plugins are developed in. Point `EVO_SRC` elsewhere, or at nothing, to
 build against a clone of the published branch instead:

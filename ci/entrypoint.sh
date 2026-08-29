@@ -49,7 +49,38 @@ case "$command" in
 
     serve)
         "$here/compose-evo.sh" "$build_dir" "${compose_args[@]}" --install
+        # php's built-in server has no rewrite engine, and the CMS's friendly
+        # URLs cannot be emulated by a router script either: Core.php decides
+        # between the alias and id lookup with filter_input(INPUT_GET, 'q'),
+        # which reads the SAPI's original request and ignores anything a router
+        # writes into $_GET or QUERY_STRING. So a served build would answer
+        # every pretty URL with the site start page and no link would work.
+        #
+        # Turning friendly URLs off makes the CMS generate index.php?id=N links
+        # instead, which this server can serve. Nothing else about the build
+        # changes, and the shipped images - which run apache/nginx/frankenphp
+        # with the real rewrite rules - are unaffected.
+        db=$(ls "$build_dir"/core/database/*.sqlite 2>/dev/null | head -1)
+        if [ -n "$db" ]; then
+            php -r "
+                \$pdo = new PDO('sqlite:' . \$argv[1]);
+                \$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+                \$sql = 'UPDATE evo_system_settings SET setting_value = ? WHERE setting_name = ?';
+                if (!\$pdo->prepare(\$sql)->execute(['0', 'friendly_urls'])) {
+                    exit(1);
+                }
+                if (!\$pdo->query('SELECT changes()')->fetchColumn()) {
+                    \$pdo->prepare('INSERT INTO evo_system_settings (setting_name, setting_value) VALUES (?, ?)')
+                        ->execute(['friendly_urls', '0']);
+                }
+            " "$db"
+            rm -f "$build_dir"/core/storage/bootstrap/siteCache.idx.php \
+                  "$build_dir"/core/storage/bootstrap/*.pageCache.php
+            echo "Friendly URLs disabled for the built-in server (see ci/entrypoint.sh)."
+        fi
+
         echo
+        echo "Site:    http://localhost:8080/"
         echo "Manager: http://localhost:8080/manager/  (admin / Passw0rd123)"
         php -S 0.0.0.0:80 -t "$build_dir"
         ;;

@@ -246,6 +246,17 @@ if [ "$do_install" = 1 ]; then
 
     step "artisan migrate --force"
     ( cd "$target/core" && php artisan migrate --force --no-interaction )
+
+    # cli-install.php does not write manager_theme or site_id - the web
+    # installer does (install/src/controllers/install.php, installLevel 4), and
+    # the CLI path has no equivalent. Left unset, the manager asks for
+    # media/style//style.css and loads with no stylesheet at all, so every
+    # build made this way looks broken before the plugin is even reached.
+    step "Settings the CLI installer leaves unset"
+    db=$(ls "$target"/core/database/*.sqlite 2>/dev/null | head -1)
+    if [ -n "$db" ]; then
+        php "$here/lib/seed-missing-settings.php" "$db" "$DEMO_PREFIX"
+    fi
 fi
 
 step "Done: $target"
