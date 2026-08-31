@@ -89,6 +89,12 @@ return [
             'file' => 'snippets/nested.php',
             'properties' => '',
         ],
+        [
+            'name' => 'aLatteXDemoRows',
+            'description' => 'Returns an array of documents, for a template to loop over during the Latte pass.',
+            'file' => 'snippets/rows.php',
+            'properties' => '',
+        ],
     ],
 
     /*

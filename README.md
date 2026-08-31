@@ -40,7 +40,7 @@ Then open **System Settings → Site** and select **aLatteX** in the *Chunk proc
 ## Demo content
 
 A working example of every construct above — six pages, six templates, five
-chunks, four snippets and three template variables — can be installed into the
+chunks, five snippets and three template variables — can be installed into the
 site:
 
 ```bash
@@ -123,6 +123,16 @@ Important caveats:
 Latte compiles each template to a PHP file stored in `storage/framework/cache/latte/`. The cache key is derived from the template content itself, so the compiled cache invalidates as soon as the template changes - whether it was saved in the admin panel or edited as a file.
 
 Evolution CMS page-level caching (`enable_cache`) works as normal on top of this.
+
+### Debugging
+
+Evolution CMS bundles [Tracy](https://tracy.nette.org), and aLatteX puts itself
+on its bar. Set `'active'` in `core/config/tracy.php` and a page rendered
+through Latte gains an **aLatteX** panel listing the templates the request
+rendered with their timings, working `{dump}` and `{dump $var}` tags, and a
+BlueScreen that reports a Latte compile error against the template it came from.
+Nothing to install, and nothing registered when Tracy is off - see
+[docs/latte-syntax.md](docs/latte-syntax.md#debugging-with-tracy).
 
 ---
 
@@ -235,6 +245,36 @@ When the plugin is installed, opening **System Settings** shows an **aLatteX** r
 
 Selecting **aLatteX** and saving enables Latte template processing site-wide.
 
+### Editing templates
+
+With aLatteX active, the manager's template editor understands Latte as well as
+EVO tags. It is the CMS's own CodeMirror, with a second overlay layered on the
+one the core installs - tags, `{$variables}`, filters, `n:attributes` and
+`{* comments *}` are coloured alongside `{{chunks}}` and `[[snippets]]`, and a
+template kept in `views/<alias>.latte` is coloured as pure Latte, because EVO
+tags in a view file stay literal.
+
+A tag is read in two registers. The structure Latte owns - the braces, the tag
+name, filters, function calls - is in the plugin's own colour; the expression
+inside it is tokenised as the PHP-ish expression it is, and returned under
+CodeMirror's own token names, so strings, numbers, arrays, operators, `true`,
+and `$variables` follow the manager's theme in light and in dark exactly as
+they do in the snippet editor. Tags spanning several lines - a `{var $rows = [
+… ]}` written over four of them, a multi-line `{* comment *}` - keep their
+highlighting all the way through.
+
+The Resource editor is deliberately different: it highlights EVO tags only.
+Latte renders the template and `[*content*]` is substituted afterwards, so a
+`{$var}` typed into a page body is printed verbatim - see
+[docs/interop.md](docs/interop.md#what-latte-does-not-see).
+
+Completion is offered through the same dropdown the manager already uses for
+chunk and snippet names. Typing `{` offers Latte's tags and functions - the
+`evo*` helpers among them - `{$` offers the document fields aLatteX spreads as
+variables, `|` offers filters and `n:` offers the attribute forms. The list is
+asked of the engine at render time, so it is whatever the installed Latte and
+its extensions really provide.
+
 ---
 
 ## File structure
@@ -248,12 +288,17 @@ aLatteX/
 │   ├── manifest.php
 │   ├── chunks/  snippets/  templates/  documents/
 ├── docs/                           syntax reference and interop notes
+├── patches/                        fixes that belong in the CMS, until they land there
 ├── plugins/
 │   └── aLattexPlugin.php           Event listeners (OnLoadWebDocument, OnManagerMainFrameHeaderHTMLBlock)
 └── src/
     ├── aLattexServiceProvider.php  Laravel service provider
     ├── LattexEngine.php            Latte engine wrapper + render pipeline
     ├── LatteViewEngine.php         renders views/<alias>.latte for the view factory
+    ├── SourceLoader.php            names the template Latte is rendering
+    ├── TracyBridge.php             wires the panel to the CMS's Tracy bar
+    ├── TracyPanel.php              the aLatteX tab itself (Tracy\IBarPanel)
+    ├── TemplateEditor.php          Latte highlighting + completion in the template editor
     ├── EvoSyntaxBridge.php         EVO tag protect/restore around Latte rendering
     ├── EvoExtension.php            Latte extension: evoChunk, evoSnippet, evoTv, …
     ├── Console/                    DemoInstallCommand, DemoRemoveCommand

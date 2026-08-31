@@ -3,7 +3,6 @@
 namespace Elcreator\aLatteX;
 
 use Latte\Engine;
-use Latte\Loaders\StringLoader;
 
 /**
  * Wraps the Latte 3.x engine for use as an Evolution CMS template processor.
@@ -32,20 +31,29 @@ class LattexEngine
 {
     private Engine $latte;
     private EvoSyntaxBridge $bridge;
+    private SourceLoader $loader;
 
     public function __construct()
     {
         $this->bridge = new EvoSyntaxBridge();
         $this->latte  = new Engine();
+        $this->loader = new SourceLoader();
 
         $cacheDir = $this->resolveCacheDir();
         $this->latte->setTempDirectory($cacheDir);
 
         $this->latte->addExtension(new EvoExtension());
 
-        // Use StringLoader with null so the template content itself is the unique cache key.
-        // Latte hashes the unique ID internally when naming compiled cache files.
-        $this->latte->setLoader(new StringLoader());
+        // Templates are rendered under a readable name, while the loader still
+        // reports the source as the unique cache key - so an edited template is
+        // recompiled, and Tracy has something short to print. See SourceLoader.
+        $this->latte->setLoader($this->loader);
+
+        // On a site with Tracy switched on, list what was rendered and how long
+        // it took on its bar. Null on every other site.
+        if ($tracy = TracyBridge::extension()) {
+            $this->latte->addExtension($tracy);
+        }
     }
 
     /**
@@ -77,8 +85,11 @@ class LattexEngine
             ]
         );
 
-        // 3. Render through Latte (StringLoader uses the content string as the unique ID)
-        $rendered = $this->latte->renderToString($protected, $params);
+        // 3. Render through Latte, under a name that says which template this is
+        $rendered = $this->latte->renderToString(
+            $this->loader->add($this->templateName($fields), $protected),
+            $params
+        );
 
         // 4. Restore EVO tags
         return $this->bridge->restore($rendered);
@@ -124,12 +135,72 @@ class LattexEngine
         );
 
         $protected = $this->bridge->protect($contents);
-        $rendered = $this->latte->renderToString($protected, $params);
+
+        // The file's own path is the name here, so Tracy's panel and its
+        // BlueScreen can offer to open the template in an editor.
+        $rendered = $this->latte->renderToString(
+            $this->loader->add($path, $protected),
+            $params
+        );
 
         return $this->bridge->restore($rendered);
     }
 
+    /**
+     * Every tag, filter and function this engine understands.
+     *
+     * Asked of the engine rather than written out, so it is the truth for the
+     * Latte the site actually has and gains whatever an extension adds - the
+     * six evo* functions of EvoExtension included. The manager's template
+     * editor completes from it; see ManagerEditor.
+     *
+     * @return array{tags: list<string>, filters: list<string>, functions: list<string>}
+     */
+    public function vocabulary(): array
+    {
+        $tags = $filters = $functions = [];
+
+        foreach ($this->latte->getExtensions() as $extension) {
+            $tags[]      = array_keys($extension->getTags());
+            $filters[]   = array_keys($extension->getFilters());
+            $functions[] = array_keys($extension->getFunctions());
+        }
+
+        $flatten = static function (array $lists): array {
+            $names = array_values(array_unique(array_merge(...$lists ?: [[]])));
+            sort($names, SORT_NATURAL | SORT_FLAG_CASE);
+
+            return $names;
+        };
+
+        return [
+            'tags'      => $flatten($tags),
+            'filters'   => $flatten($filters),
+            'functions' => $flatten($functions),
+        ];
+    }
+
     // -------------------------------------------------------------------------
+
+    /**
+     * What to call a template held in the database.
+     *
+     * There is no file and no name in what the core hands over - only the
+     * document's fields, one of which is the id of the template it was rendered
+     * from. That id is what a developer needs to find the record, so it is the
+     * name; where it is missing (a chunk rendered straight through the engine, a
+     * fixture) the generic name still beats a source dump.
+     *
+     * @param  array<string, mixed> $fields  a flattened documentObject
+     */
+    private function templateName(array $fields): string
+    {
+        $id = $fields['template'] ?? null;
+
+        return is_numeric($id)
+            ? 'Evolution template #' . (int) $id
+            : 'Evolution template';
+    }
 
     private function resolveCacheDir(): string
     {

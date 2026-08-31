@@ -42,6 +42,15 @@ function renderDemoDocument(string $alias): string
         ],
         chunks: DemoContent::chunkMap(),
         documents: $aliasToId,
+        // The one snippet a demo template calls for *data* rather than markup.
+        // On a site it is a query; here it is the shape that query returns, so
+        // the template's loop over it is what gets exercised.
+        snippets: [
+            'aLatteXDemoRows' => [
+                ['id' => 3, 'title' => 'Latte basics', 'body' => 'Every Latte construct aLatteX passes through.', 'url' => '/index.php?id=3'],
+                ['id' => 4, 'title' => 'EVO syntax', 'body' => 'The six tag forms, untouched.', 'url' => '/index.php?id=4'],
+            ],
+        ],
     );
 
     return (new LattexEngine())->render(
@@ -59,7 +68,7 @@ function requireLatte(): void
 
 test('the demo manifest describes a complete, self-consistent set', function (): void {
     assertSame(5, count(DemoContent::chunks()));
-    assertSame(4, count(DemoContent::snippets()));
+    assertSame(5, count(DemoContent::snippets()));
     assertSame(3, count(DemoContent::tvs()));
     assertSame(6, count(DemoContent::templates()));
     assertSame(6, count(DemoContent::documents()));
@@ -166,6 +175,25 @@ test('a chunk of Latte source stays literal until something renders it', functio
 
     // The pass that does compile it is a snippet call, left for the CMS.
     assertStringContains('[[aLatteXDemoLatte?', $rendered);
+});
+
+test('a snippet can hand a template data to loop over', function (): void {
+    requireLatte();
+
+    $rendered = renderDemoDocument('alattex-chunks');
+
+    // The rows came back from $evo->runSnippet() as an array, during the Latte
+    // pass, and the template looped over them - which is the whole difference
+    // from [[aLatteXDemoRows]], resolved long afterwards by the CMS parser.
+    assertStringContains('<a href="/index.php?id=3">Latte basics</a>', $rendered);
+    assertStringContains('<a href="/index.php?id=4">EVO syntax</a>', $rendered);
+
+    // The snippet returned data, so Latte is the one that escaped it.
+    assertStringContains('Every Latte construct aLatteX passes through.', $rendered);
+
+    // And the deferred spellings stay documentation rather than becoming live
+    // tags: the paragraph explaining them is written with entities.
+    assertStringNotContains('[[aLatteXDemoRows]]', $rendered);
 });
 
 test('syntax off stops Latte but not the Evolution CMS parser', function (): void {

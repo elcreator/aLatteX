@@ -142,6 +142,7 @@ final class FakeEvolutionCore
         private array $chunks = [],
         public array $placeholders = [],
         private array $documents = [],
+        private array $snippets = [],
     ) {
     }
 
@@ -171,6 +172,23 @@ final class FakeEvolutionCore
     public function getChunk(string $name): string
     {
         return $this->chunks[$name] ?? '';
+    }
+
+    /**
+     * A snippet run from inside the Latte pass, the way a template asks for
+     * data rather than for markup - see demo/snippets/rows.php.
+     *
+     * The double is a map rather than an evaluator on purpose: what these tests
+     * cover is the template's use of the value, and the CMS is what runs the
+     * PHP. A callable entry is called so a fixture can react to its parameters.
+     *
+     * @param array<string, mixed> $params
+     */
+    public function runSnippet(string $name, array $params = []): mixed
+    {
+        $snippet = $this->snippets[$name] ?? '';
+
+        return is_callable($snippet) ? $snippet($params) : $snippet;
     }
 
     /**
@@ -248,6 +266,7 @@ function useFakeEvo(
     array $chunks = [],
     array $placeholders = [],
     array $documents = [],
+    array $snippets = [],
 ): FakeEvolutionCore {
     return $GLOBALS['evo'] = new FakeEvolutionCore(
         $documentObject,
@@ -255,5 +274,6 @@ function useFakeEvo(
         $chunks,
         $placeholders,
         $documents,
+        $snippets,
     );
 }

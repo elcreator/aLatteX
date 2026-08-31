@@ -226,10 +226,9 @@ expression (`count()`, `implode()`, `in_array()`, …).
 
 | Feature | Why |
 | --- | --- |
-| `{layout}`, `{extends}`, `{import}`, `{embed}`, `{sandbox}`, `{include 'file.latte'}` | aLatteX renders a database string through a `StringLoader`, so there is no file to resolve a name against. Blocks defined in the same template work; inheritance across templates does not. |
+| `{layout}`, `{extends}`, `{import}`, `{embed}`, `{sandbox}`, `{include 'file.latte'}` | aLatteX renders one template at a time from a string, so there is no directory to resolve a second name against. Blocks defined in the same template work; inheritance across templates does not. |
 | `{syntax double}` | Its delimiter is `{{…}}`, which is how Evolution CMS spells a chunk. aLatteX tokenises those before Latte sees them. |
 | `{cache}` | Needs `nette/caching`. Use the CMS's own page cache instead - see [interop.md](interop.md#caching). |
-| `{dump}`, Tracy integration | Needs `tracy/tracy`. |
 | `|webalize`, `|localDate`, `{translate}` | Need `nette/utils`, `ext-intl` and a translator respectively; none is a dependency of this plugin. |
 | `{php}` | Removed in Latte 3. Use `{do}`. |
 | `{snippet}`, `{control}`, `{link}`, `{plink}` | Nette Application tags. Unrelated to Evolution CMS snippets - use `[[…]]` or `evoSnippet()`. |
@@ -239,3 +238,66 @@ to change the response type.
 
 For the parts of a template that must not be parsed at all, see
 [interop.md](interop.md#raw-output).
+
+---
+
+## Debugging with Tracy
+
+Evolution CMS ships [Tracy](https://tracy.nette.org) - `tracy/tracy` is a
+requirement of `core/composer.json`, and `EvolutionCMS\Providers\TracyServiceProvider`
+hangs the CMS's own panels on its bar. aLatteX adds one more when it is on, and
+adds nothing when it is off. There is nothing to install.
+
+Switch it on in `core/config/tracy.php`:
+
+```php
+'active' => 'adminfrontonly',   // or true, 'manager', 'admin', 'managerfrontonly'
+```
+
+Then a front-end page rendered through aLatteX gets:
+
+- **an `aLatteX` panel on the bar**, listing every template the request
+  rendered and how long each took - a template kept in a file is a link that
+  opens it in your editor;
+- **`{dump $var}`**, which sends a value to Tracy's dump panel, and
+  `{dump}` on its own, which sends all of them;
+- **a BlueScreen that knows Latte**, for a template kept in a file: a compile
+  error in `views/<alias>.latte` comes back as a Tracy error page naming the
+  file and the line, and a runtime error in a compiled template is traced back
+  to its `.latte` line rather than to generated PHP.
+
+A template held in the database is listed as `Evolution template #12`, naming
+the `site_templates` record; one held in a file is listed under its path, and
+is clickable if [Tracy's editor link](https://tracy.nette.org/en/open-files-in-ide)
+is configured.
+
+The panel does **not** dump template parameters by default. One of them is
+`$evo` - the whole CMS core, and through it the container and the database
+connection - which Tracy would walk to `Debugger::$maxDepth`, a limit the CMS
+raises to 20. Sites that want the dump anyway can ask for it in
+`core/custom/config/alattex.php`:
+
+```php
+<?php
+
+return [
+    'tracy' => [
+        'enabled' => true,          // false: never register the panel, even with Tracy on
+        'dump_parameters' => false, // true: dump the parameters, $evo included
+    ],
+];
+```
+
+Two things are worth knowing before you go looking for the panel.
+
+**A template held in the database never reaches the BlueScreen.** The plugin
+catches its errors, writes them to `evo_event_log` and leaves the document
+unrendered - so a page that comes back as raw template source is a Latte error,
+the bar panel has no row for it, and the log entry has the message, now prefixed
+with the template's name. The BlueScreen above is for the file case, which the
+CMS renders through Laravel's view factory and the plugin does not wrap.
+
+**A cached page has no panel.** Evolution CMS serves a cached document from
+`core/storage/bootstrap/docid_*.pageCache.php` without ever calling the parser,
+so nothing renders and there is nothing to list. Clear the cache, or turn
+`enable_cache` off on the document you are working on.

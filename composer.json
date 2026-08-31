@@ -17,7 +17,8 @@
     "latte/latte": "^3.1"
   },
   "require-dev": {
-    "pestphp/pest": "^4.0"
+    "pestphp/pest": "^4.0",
+    "tracy/tracy": "^2.10"
   },
   "autoload": {
     "psr-4": {

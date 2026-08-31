@@ -2,6 +2,7 @@
 
 use Elcreator\aLatteX\LattexEngine;
 use Elcreator\aLatteX\ManagerEditor;
+use Elcreator\aLatteX\TemplateEditor;
 
 // ---------------------------------------------------------------------------
 // Front-end: process templates through Latte when aLatteX is selected
@@ -50,10 +51,21 @@ Event::listen('evolution.OnLoadWebDocument', function (): void {
             $evo->documentObject ?? []
         );
     } catch (\Throwable $e) {
+        // Which template failed is the first thing anyone reading this log
+        // wants, and Latte knows it: aLatteX renders under a name - see
+        // SourceLoader - and a compile or sandbox error carries that name.
+        // Latte folds it into the message itself only when it is a real file
+        // path, which the name of a template held in the database is not.
+        $source = property_exists($e, 'sourceName')
+            && is_string($e->sourceName)
+            && !@is_file($e->sourceName)
+                ? $e->sourceName . ': '
+                : '';
+
         $evo->logEvent(
             0,
             3,
-            'aLatteX template error: ' . $e->getMessage()
+            'aLatteX template error: ' . $source . $e->getMessage()
                 . '<br><pre>' . htmlspecialchars($e->getTraceAsString()) . '</pre>',
             'aLatteX'
         );
@@ -209,4 +221,23 @@ HTML;
  */
 Event::listen('evolution.OnDocFormRender', function (): string {
     return ManagerEditor::documentEditorScript();
+});
+
+// ---------------------------------------------------------------------------
+// Admin panel: teach the template editor Latte
+// ---------------------------------------------------------------------------
+
+/**
+ * OnTempFormRender fires while the template form is being built, and its return
+ * value is printed at the end of the form - alongside the CodeMirror plugin's
+ * own output, which is printed by the same event.
+ *
+ * The template is where Latte is actually live, and the editor there knows only
+ * EVO tags. TemplateEditor layers Latte on top of the mode the CMS's plugin
+ * already built, and hangs the tags, filters and functions the engine reports -
+ * evoChunk() and friends among them - on the same completion dropdown the
+ * manager already uses for chunk and snippet names.
+ */
+Event::listen('evolution.OnTempFormRender', function (): string {
+    return TemplateEditor::templateEditorScript();
 });

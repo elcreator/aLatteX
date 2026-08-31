@@ -87,6 +87,48 @@
     </div>
 </section>
 
+<section id="snippet-data">
+    <h3>Where the rows really come from</h3>
+    <p>
+        The array above is written into the template, which is fine for a demo
+        and wrong for a site: the rows a page lists live in the database. A
+        snippet can hand them over as data, because
+        <code>Core::evalSnippet()</code> returns an array or an object
+        untouched and only stringifies everything else - so this runs during
+        the Latte pass and gives the template something to loop over.
+    </p>
+
+    {var $rows = $evo->runSnippet('aLatteXDemoRows', ['parent' => $parent, 'limit' => 4])}
+
+    {if $rows}
+        <ul class="alx-rows">
+            {foreach $rows as $row}
+                <li>
+                    <a href="{$row['url']}">{$row['title']}</a>
+                    {* Escaped by Latte, because what arrived was data - and
+                       dropped entirely by n:ifcontent when the document has no
+                       introtext, which most of this demo set does not. *}
+                    <span class="alx-dim" n:ifcontent>{$row['body']|stripHtml|trim|truncate:70}</span>
+                </li>
+            {/foreach}
+        </ul>
+    {else}
+        <p class="alx-empty">
+            Nothing published under document {$parent}. The snippet returned an
+            empty array, and the template said so instead of printing nothing.
+        </p>
+    {/if}
+
+    <p>
+        <code>&#91;&#91;aLatteXDemoRows&#93;&#93;</code> and
+        <code>&#123;evoSnippet('aLatteXDemoRows')&#125;</code> would both be
+        wrong here - and the first is written with entities, or the CMS would
+        expand it on its way past and run the snippet a second time. Each defers to the Evolution CMS parser, which runs after
+        Latte has finished - by then there is no loop left to feed. Calling
+        through <code>$evo</code> is what makes the value arrive in time.
+    </p>
+</section>
+
 <section id="snippet-output">
     <h3>Snippet output is not Latte either</h3>
     <p>

@@ -17,6 +17,70 @@ rendered.
 
 ---
 
+## What Latte does not see
+
+Latte sees the template, and only the template. A document's **content** field is
+substituted into it by `parseDocumentSource()` - which runs *after* Latte has
+finished - so Latte syntax typed into a resource is printed exactly as written:
+
+| In the content field | On the page |
+| --- | --- |
+| `[*pagetitle*]` | `Latte basics` - an EVO tag, resolved by the parser that owns it |
+| `{if true}yes{/if}` | `{if true}yes{/if}` - Latte never ran on this string |
+
+The same goes for chunk and snippet output, for the same reason - see
+[Latte inside a chunk](#latte-inside-a-chunk) for what to do instead.
+
+This is why the manager's Resource editor highlights EVO tags and not Latte
+ones, while the template editor highlights both. The colouring follows the
+pipeline: what is coloured as code is what runs as code.
+
+### Chunks called from the content field
+
+**They work, exactly as they always did.** `parseDocumentSource()` owns the
+content field, and expanding `{{chunks}}` is its job. Writing this in a
+resource:
+
+```
+{{aLatteXDemoBadge}}
+```
+
+puts the chunk on the page, and the `[(chunk_processor)]` inside that chunk is
+resolved too - a tag produced by a chunk is picked up by a later pass, the same
+as in a template:
+
+```html
+<span class="alx-badge">chunk_processor = aLatteX</span>
+```
+
+What does *not* happen is Latte. A chunk called from the content field is
+inserted as markup, so Latte syntax in the chunk reaches the page verbatim -
+the same rule as a chunk called from a template, and with the same three ways
+out below. Nothing about being called from the content changes it: Latte
+finished before either the content or the chunk existed on the page.
+
+### `[*content*]` and `{$content}` are not the same thing
+
+The document's content is reachable two ways, and only one of them keeps EVO
+tags working:
+
+| In the template | `{{chunk}}` in the content | `[[snippet]]` in the content |
+| --- | --- | --- |
+| `[*content*]` | expanded | expanded |
+| `{$content}` | **broken**, silently | expanded |
+
+`{$content}` prints a *value*, and Latte's HTML escaper defends against
+client-side template injection by breaking a double brace apart - `{{name}}`
+comes out as `{<!-- -->{name}}`, which the CMS then does not recognise. The
+square-bracket forms are not a mustache and are left alone, so a snippet call in
+the same string still runs.
+
+So use `[*content*]` for the page body. Reach for `{$content}` only to derive
+something from it - `{$content|stripHtml|truncate:160}` for a meta description,
+say - where breaking a chunk tag is the safe outcome rather than a surprise.
+
+---
+
 ## Latte inside a chunk
 
 A chunk is expanded by `mergeChunkContent()`, long after Latte has finished.
@@ -73,6 +137,60 @@ If a chunk only exists to be Latte, it is a `{define}` block in the template.
 The same rule runs the other way: **a snippet's return value is not Latte
 either.** A snippet that returns `{$pagetitle}` prints those characters. It
 *is* re-parsed for EVO tags, though, which is what makes nesting work.
+
+---
+
+## Data from a snippet
+
+Everything above is about markup arriving too late for Latte. The way round it
+is not to send markup at all.
+
+`Core::evalSnippet()` ends with
+
+```php
+if (is_array($return) || is_object($return)) {
+    return $return;
+}
+
+return $echo . $return;
+```
+
+so a snippet that returns an array is handed back as an array. Call it through
+`$evo` and it runs *inside* the Latte pass, early enough for the template to
+loop over what comes back:
+
+```latte
+{var $rows = $evo->runSnippet('aLatteXDemoRows', ['parent' => $parent, 'limit' => 4])}
+
+{foreach $rows as $row}
+    <li><a href="{$row['url']}">{$row['title']}</a></li>
+{/foreach}
+```
+
+`demo/snippets/rows.php` is the snippet: a query against `site_content`, no
+markup in it at all. This is the shape most real templates want, because the
+rows a page lists live in the database rather than in a `{var}`.
+
+**The two deferred spellings do not work here, and it is worth being clear
+about why.** `[[aLatteXDemoRows]]` and `{evoSnippet('aLatteXDemoRows')}` both
+hand a *tag* to the page for `parseDocumentSource()` to expand afterwards - by
+which time Latte has finished and there is no loop left to feed. They are for
+markup you want spliced into the output; `$evo->runSnippet()` is for values you
+want to compute with.
+
+Three things follow from running during the Latte pass:
+
+- **Escaping is yours to get right, and Latte does it.** Data arrives raw, and
+  `{$row['title']}` escapes it on the way out. A snippet that returns HTML it
+  wants kept has to say so with `|noescape`, which is the correct place for
+  that decision to be visible.
+- **The snippet is not re-parsed for EVO tags.** A tag in a returned *string*
+  is expanded by a later pass as usual; a tag inside a returned *array* is
+  printed by Latte as text, because Latte prints it and the parser never sees a
+  tag - it sees escaped output.
+- **`runSnippet()`'s own cache parameters still apply.** `$evo->runSnippet($name,
+  $params, $cacheTime)` caches through Evolution CMS's cache the same way it
+  does anywhere else, which is the cheap way to keep a query off every request.
 
 ---
 

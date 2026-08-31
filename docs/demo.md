@@ -1,6 +1,6 @@
 # The demo set
 
-A working site's worth of aLatteX: six pages, six templates, five chunks, four
+A working site's worth of aLatteX: six pages, six templates, five chunks, five
 snippets and three template variables, installed into a real Evolution CMS
 database so you can open them in a browser and read them in the manager.
 
@@ -114,6 +114,7 @@ Every page carries two blocks in its content field, on top of its introduction:
 | `aLatteXDemoClock` | The smallest possible snippet; makes the cacheable/non-cacheable difference visible on reload. |
 | `aLatteXDemoLatte` | Renders a chunk or an inline string through aLatteX itself - the second pass. |
 | `aLatteXDemoNested` | Returns EVO tags *and* calls `runSnippet()`: both ways of nesting. |
+| `aLatteXDemoRows` | Returns an **array** of documents, for the template to loop over during the Latte pass. |
 
 | TV | Type | Point |
 | --- | --- | --- |

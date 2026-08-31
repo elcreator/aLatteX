@@ -22,16 +22,21 @@ demo/
   manifest.php             The demo set as data: names, relationships, metadata
   chunks/ snippets/ templates/ documents/   One file per element body
 docs/                      User- and agent-facing syntax reference
+patches/                   Fixes that belong in the CMS, kept until they are upstream
 plugins/
   aLattexPlugin.php        Three Event::listen calls — the only runtime entry points
 src/
   aLattexServiceProvider.php  Extends EvolutionCMS\ServiceProvider
   LattexEngine.php            Wraps Latte\Engine; owns the render pipeline
   LatteViewEngine.php         Illuminate view Engine for views/<alias>.latte
+  SourceLoader.php            Latte\Loader: names a template, source stays the cache key
+  TracyBridge.php             Wires the panel on; the only place Latte's Tracy bridge is touched
+  TracyPanel.php              The aLatteX tab itself, against Tracy\IBarPanel
   EvoSyntaxBridge.php         Regex-based protect/restore for EVO tag syntax
   TokenSecret.php             The plugin's own key, behind the token HMAC
   DocumentObject.php          Flattens documentObject: a TV is [name, value, ...]
   ManagerEditor.php           CodeMirror on the Resource content field, EVO-tag mode
+  TemplateEditor.php          Latte overlay + completion on the template editor
   EvoExtension.php            Latte\Extension subclass; adds evo* functions
   Console/                    DemoInstallCommand, DemoRemoveCommand (console only)
   Demo/
@@ -66,6 +71,41 @@ Two handlers, both returning a `<script>` and neither overriding a Blade view.
 `OnDocFormRender` fires while the document form is built, and its output lands inside the form below the content textarea. The handler hands over to `src/ManagerEditor.php`, which puts CodeMirror on the field with an EVO-tag overlay on `htmlmixed`. Evolution leaves that one field bare: the CodeMirror plugin only initialises when `$rte === 'none'`, and a stock install has `use_editor = 1` with `which_editor = 'TinyMCE4'` (`core/factory/settings.php`) while no rich-text editor is in the base install set — so `$rte` names an editor that is not there, CodeMirror stays out, and nothing else steps in. It stands down when `myCodeMirrors['ta']` already exists, when the page renders a `which_editor` picker set to a real editor, and when the CMS ships no CodeMirror assets to load.
 
 **It highlights EVO tags only, and that is deliberate.** Latte renders the *template* at `OnLoadWebDocument`; `[*content*]` is substituted afterwards by EVO's parser pass, so a document's content field arrives as data. Verified on a real site: content `LATTE[{$pagetitle}] EVO[[*pagetitle*]]` renders as `LATTE[{$pagetitle}] EVO[aLatteX probe]`. Colouring Latte in that field would advertise a feature the pipeline does not have. The template editor is where Latte is live, and it is still highlighted by the core's EVO-only MODx mode — a Latte-aware mode there would be a real improvement and is not done.
+
+`OnTempFormRender` fires while the template form is built, and its output lands
+at the end of the form - alongside the CodeMirror plugin's, which the same event
+prints. `src/TemplateEditor.php` does not build an editor there: the CMS already
+does, and CodeMirror overlays stack, so Latte is added as a second overlay on
+top of the core's EVO one. Two modes, because a database template is read by
+Latte *and* by the EVO parser while a `views/<alias>.latte` file is read only by
+Latte - so the file case drops the EVO layer, for the same reason the content
+field never gains a Latte one.
+
+The overlay tokenises a tag body rather than swallowing it: `overlay()` hands
+off to `expression()` once inside `{...}`, and carries `expr`/`str`/`open` in
+its state so a tag, a string or a comment can span lines. Expression parts are
+returned under CodeMirror's own token names (`string`, `number`, `operator`,
+`keyword`, `atom`, `bracket`, `property`), which both shipped stylesheets
+already colour - so only `latte*` classes need CSS of their own, and a theme
+change costs nothing here.
+
+Completion goes through `CodeMirror.showHint`, the addon
+`manager/media/script/element-name-helper.js` already uses for `{{chunk}}` and
+`[[snippet]]` names. The two never answer the same keystroke: that one owns
+`{{`, `[[`, `[!` and `@`, this one owns a single `{`, `{$`, `|` and `n:`. The
+vocabulary is `LattexEngine::vocabulary()` - asked of the live engine, so it
+carries whatever an extension contributes and cannot drift from it.
+
+**Two things about the core's editor are worth knowing before touching this.**
+The overlay mode is named `MODx-htmlmixed` on cores from before the rename and
+`Evo-htmlmixed` after it, so both are looked for. And
+`manager/views/page/template.blade.php` resets the mode to a name with no
+overlay in it - from its own `DOMContentLoaded` handler, after the CodeMirror
+plugin's inline script has built the editor - which switches the EVO
+highlighting off on every template page of a site that has any template-file
+engine registered. aLatteX registers one, so `TemplateEditor` wraps `setOption`
+on its own instance and puts the mode back. The fix for the core itself is
+`patches/evo-template-highlighting.patch`.
 
 ### Activation
 
@@ -125,7 +165,10 @@ Snippet parameters: `[[name?&key=\`value\`&key2=\`value2\`]]`
 
 ## Latte 3.x API notes
 
-- `Engine::setLoader(new StringLoader())` — `StringLoader(null)` uses the content string itself as the unique ID; Latte hashes it when naming cache files.
+- `Engine::setLoader(new StringLoader())` — `StringLoader(null)` uses the content string itself as the unique ID; Latte hashes it when naming cache files. aLatteX uses `SourceLoader` instead, which separates the two: the *name* is short and printable, `getUniqueId()` is still the source, so the cache key is unchanged and the Tracy panel and `CompileException::$sourceName` stop carrying a whole template.
+- **Latte's Tracy bridge classes are `@internal`.** `Latte\Bridges\Tracy\LattePanel` is marked `@internal` and its only non-warning constructor `@deprecated`; `BlueScreenPanel` is `@internal` too. A patch release may move either, so the bar panel is *not* built on them: `src/TracyPanel.php` implements `Tracy\IBarPanel`, which carries no `@internal` and is two methods wide. Latte's nesting tree is the only thing given up, and aLatteX cannot produce one anyway — every tag that nests templates needs a second template to resolve a name against.
+- `BlueScreenPanel::initialize()` is the one `@internal` call that remains, because reimplementing the compiled-PHP-to-`.latte` source mapping is not worth it. It is reached through `class_exists()` + `method_exists()` inside a `try/catch`, and `TracyBridge::extension()` swallows any Throwable from setup — a debugging aid must not be able to take down the site it is meant to help debug.
+- `Tracy\Debugger::isEnabled()` is the switch. `EvolutionCMS\ExceptionHandler` registers `TracyServiceProvider` (which calls `Debugger::enable()` when `tracy.active` resolves truthy) and `Core::initialize()` resolves that handler at the top of the request — before any event fires, so the lazily-made engine always sees a settled answer. It stays true in Tracy's production mode, where the bar is collected and never printed.
 - `Engine::setTempDirectory(string)` — compiled PHP cache location.
 - `Engine::addExtension(Extension)` — register tags, filters, functions.
 - `Extension::getFunctions(): array` — `['functionName' => callable]`.
@@ -140,9 +183,12 @@ Snippet parameters: `[[name?&key=\`value\`&key2=\`value2\`]]`
 | Add a new EVO-style helper function in Latte | `src/EvoExtension.php` → `getFunctions()` |
 | Support an additional EVO tag syntax pattern | `src/EvoSyntaxBridge.php` → `DELIMITERS` constant (and `NAME_START`/`NAME_REST` if the name grammar changes) |
 | Change the Latte cache location | `src/LattexEngine.php` → `resolveCacheDir()` |
+| Change what the Tracy panel shows, or its config keys | `src/TracyBridge.php` |
+| Change how a template is named in the panel and in errors | `src/LattexEngine.php` → `templateName()` / `renderView()` |
 | Add/remove Latte variables available in templates | `src/LattexEngine.php` → `render()`, `$params` array |
 | Change where the chunk_processor radio is injected | `plugins/aLattexPlugin.php` → the `OnSiteSettingsRender` listener |
 | Change the Resource content editor (mode, theme, options) | `src/ManagerEditor.php` |
+| Change Latte highlighting or completion in the template editor | `src/TemplateEditor.php` |
 | Add Latte filters or tags | `src/EvoExtension.php` → `getFilters()` / `getTags()` |
 | Register routes, migrations, or views | `src/aLattexServiceProvider.php` → `boot()` |
 | Add or change a demo page/element | `demo/manifest.php` plus the file it names |
