@@ -22,17 +22,36 @@ Event::listen('evolution.OnLoadWebDocument', function (): void {
         return;
     }
 
-    // A document whose template alias resolves to a file under /views/ has
-    // already been rendered by that file's engine - Latte's own .latte files
-    // included - and the CMS skips its parser for it. documentContent is
-    // finished HTML at this point, not template code, and running it through
-    // Latte again is a second pass over somebody else's output: a no-op at
+    // A document whose template resolves to a file under /views/ has already
+    // been rendered by that file's engine - Latte's own .latte files included.
+    // documentContent is finished HTML by now, not template code, so Latte must
+    // not run again: a second pass over somebody else's output is a no-op at
     // best, and at worst it aborts on the first brace of an inline stylesheet
     // and logs an error on every request.
+    //
+    // What that file *does* still need is the rest of the pipeline. Core.php
+    // gates the EVO parser on the same fact:
+    //
+    //     if (!$template) {
+    //         $this->documentContent = $this->parseDocumentSource($this->documentContent);
+    //     }
+    //     ...
+    //     $template ? $this->outputContent(false, false) : $this->outputContent();
+    //
+    // so a view-rendered document skips parseDocumentSource(), the [!…!] pass,
+    // cleanUpMODXTags() and rewriteUrls() - and every EVO tag in it reaches the
+    // page as text. For aLatteX that is the wrong trade: where a template lives
+    // is a version-control decision, not a syntax one, and the same template
+    // must mean the same thing in the database and in a file.
+    //
+    // finishViewRender() runs those passes here. It is scoped to .latte files:
+    // Blade's identical behaviour is Blade's to change, not this plugin's.
     $renderedFromView = property_exists($evo, 'documentTemplateView')
         ? (string) $evo->documentTemplateView
         : '';
     if ($renderedFromView !== '') {
+        alattexFinishViewRender($evo);
+
         return;
     }
 
@@ -241,3 +260,80 @@ Event::listen('evolution.OnDocFormRender', function (): string {
 Event::listen('evolution.OnTempFormRender', function (): string {
     return TemplateEditor::templateEditorScript();
 });
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Give a view-rendered document the parser passes the core skips for it.
+ *
+ * Core.php takes a different branch for a document whose template resolves to a
+ * file, and that branch omits four things the database branch does:
+ *
+ *   1. parseDocumentSource() - gated on `if (!$template)`;
+ *   2. the [!non-cacheable!] pass, and
+ *   3. cleanUpMODXTags() + rewriteUrls() - all three skipped because the file
+ *      branch calls outputContent(false, false), turning $postParse off;
+ *   4. the page cache, because that branch also forces cacheable = 0 and never
+ *      registers postProcess(). That one cannot be restored from here.
+ *
+ * 1 to 3 are what make EVO tags work, so they are run here in the core's own
+ * order, using the core's own methods. The result is that moving a template
+ * from the database into views/<alias>.latte changes where it is stored and
+ * nothing else.
+ *
+ * Only .latte views are touched. A .blade.php template reaches the same core
+ * branch and behaves the same way; that is Blade's contract with the CMS and
+ * this plugin has no business rewriting it.
+ */
+function alattexFinishViewRender(object $evo): void
+{
+    $viewPath = '';
+
+    try {
+        $viewPath = (string) app('TemplateProcessor')->getDocumentViewPath();
+    } catch (\Throwable) {
+        // No TemplateProcessor, no way to tell whose view this is: leave it be.
+        return;
+    }
+
+    if (!str_ends_with(strtolower($viewPath), '.latte')) {
+        return;
+    }
+
+    $content = (string) $evo->documentContent;
+
+    if ($content === '') {
+        return;
+    }
+
+    try {
+        $content = $evo->parseDocumentSource($content);
+
+        // outputContent() does this when it post-parses: a non-cacheable tag is
+        // a cacheable one that was held back, so it is rewritten and parsed on
+        // a second pass. A view-rendered document is never page-cached, so the
+        // distinction is moot for it - but [!name!] still has to resolve.
+        if (str_contains($content, '[!')) {
+            $content = str_replace(['[!', '!]'], ['[[', ']]'], $content);
+            $evo->minParserPasses = 2;
+            $content = $evo->parseDocumentSource($content);
+        }
+
+        $content = $evo->cleanUpMODXTags($content);
+        $content = $evo->rewriteUrls($content);
+
+        $evo->documentContent = $content;
+    } catch (\Throwable $e) {
+        // The page already has its markup; losing the EVO pass leaves tags on
+        // screen, which is bad, but taking the page down is worse.
+        $evo->logEvent(
+            0,
+            3,
+            'aLatteX could not finish the parser passes for ' . htmlspecialchars($viewPath)
+                . ': ' . $e->getMessage(),
+            'aLatteX'
+        );
+    }
+}

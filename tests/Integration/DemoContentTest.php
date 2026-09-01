@@ -53,7 +53,9 @@ function renderDemoDocument(string $alias): string
         ],
     );
 
-    return (new LattexEngine())->render(
+    // The set ships its own layouts, so the engine resolves {extends 'base.latte'}
+    // against demo/views/ - the directory demo:install copies into the site's.
+    return (new LattexEngine([DemoContent::directory() . '/views']))->render(
         DemoContent::templateMap()[$documents[$alias]['template']],
         $documentObject,
     );
@@ -70,8 +72,9 @@ test('the demo manifest describes a complete, self-consistent set', function ():
     assertSame(6, count(DemoContent::chunks()));
     assertSame(5, count(DemoContent::snippets()));
     assertSame(3, count(DemoContent::tvs()));
-    assertSame(6, count(DemoContent::templates()));
-    assertSame(6, count(DemoContent::documents()));
+    assertSame(8, count(DemoContent::templates()));
+    assertSame(8, count(DemoContent::documents()));
+    assertSame(2, count(DemoContent::views()));
 
     $templateNames = array_keys(DemoContent::templateMap());
 
@@ -251,4 +254,58 @@ test('template variables arrive as ordinary Latte values', function (): void {
 
     // A TV that is not attached to the template is simply absent.
     assertStringContains('not attached to this template', $rendered);
+});
+
+test('a database template extends a layout file', function (): void {
+    requireLatte();
+
+    $rendered = renderDemoDocument('alattex-extends-page');
+
+    // The child filled base.latte's blocks ...
+    assertStringContains('<h1>Extending a layout</h1>', $rendered);
+    assertStringContains('Aside replaced by the child', $rendered);
+
+    // ... and inherited the markup it said nothing about.
+    assertStringContains('<!doctype html>', $rendered);
+    assertStringContains('class="alx-foot"', $rendered);
+    assertStringContains('Rendered by base.latte', $rendered);
+
+    // base.latte's own default block is gone, because the child replaced it.
+    assertStringNotContains('Default aside, from base.latte', $rendered);
+
+    // EVO tags survive from both halves for the CMS parser to resolve.
+    assertStringContains('[(site_name)]', $rendered);
+    assertStringContains('{{aLatteXDemoHeader}}', $rendered);
+    assertStringNotContains('__ALATTEX_', $rendered);
+});
+
+test('three templates deep, and each level only names the one above it', function (): void {
+    requireLatte();
+
+    $rendered = renderDemoDocument('alattex-extends-article');
+
+    // Grandparent: base.latte.
+    assertStringContains('<!doctype html>', $rendered);
+    assertStringContains('Rendered by base.latte', $rendered);
+
+    // Parent: base-article.latte, whose frame the child never mentions.
+    assertStringContains('class="alx-article-body"', $rendered);
+    assertStringContains('Article aside, from base-article.latte', $rendered);
+
+    // Child: the record in the database.
+    assertStringContains('A template three levels deep', $rendered);
+    assertStringContains('base-article.latte', $rendered);
+
+    // {include parent} adds to the grandparent's block instead of replacing
+    // it, so both crumbs are present.
+    assertStringContains('Home', $rendered);
+    assertStringContains('article', $rendered);
+
+    // A block the middle layer left empty for the child to fill.
+    assertStringContains('which base-article.latte left empty', $rendered);
+
+    // And a chunk partial still resolves at the bottom of the chain.
+    assertStringContains('Included three levels down', $rendered);
+
+    assertStringNotContains('__ALATTEX_', $rendered);
 });

@@ -15,17 +15,13 @@ namespace Elcreator\aLatteX;
  * stands down rather than building a replacement, because the template field is
  * the CMS's to furnish and it normally does.
  *
- * Two modes, because a template can live in two places and they do not mean the
- * same thing:
- *
- *   - a template held in the database is parsed by Latte *and* by the EVO
- *     parser afterwards, so both syntaxes are live and the Latte overlay goes
- *     on top of the CMS's own;
- *   - a template held in views/<alias>.latte is rendered through the view
- *     factory and never reaches parseDocumentSource(), so an EVO tag in it
- *     stays literal. That one gets the Latte overlay on plain htmlmixed, with
- *     no EVO colouring - the same reasoning that keeps ManagerEditor from
- *     colouring Latte in the Resource content field, pointed the other way.
+ * One mode, for both places a template can live. That was not always so: a
+ * template held in views/<alias>.latte used to get Latte colouring without the
+ * EVO layer, because the core skips its parser for a view-rendered document and
+ * an EVO tag in such a file reached the page as text. aLatteX now runs those
+ * passes itself - see alattexFinishViewRender() in plugins/aLattexPlugin.php -
+ * so a file means exactly what the same code means in the database, and the
+ * editor says so by colouring both syntaxes either way.
  *
  * The completion vocabulary is asked of the engine (LattexEngine::vocabulary()),
  * not written out here, so it is the truth for the Latte the site has and
@@ -193,9 +189,8 @@ class TemplateEditor
 
     var CONFIG = __ALATTEX_TEMPLATE_EDITOR_CONFIG__;
 
-    // With the EVO overlay underneath, and without it.
+    // Latte on top of the CMS's EVO overlay. One mode: see the class docblock.
     var MODE_DB = 'alattex-template';
-    var MODE_FILE = 'alattex-latte';
 
     // What the CMS's own CodeMirror plugin opens the template editor with, and
     // what manager/views/page/template.blade.php resets it to. Both are watched
@@ -519,7 +514,7 @@ class TemplateEditor
             return false;
         }
 
-        if (CM.modes[MODE_DB] && CM.modes[MODE_FILE]) {
+        if (CM.modes[MODE_DB]) {
             return true;
         }
 
@@ -532,17 +527,15 @@ class TemplateEditor
             return CM.overlayMode(CM.getMode(config, base), overlay(vocabulary));
         });
 
-        CM.defineMode(MODE_FILE, function (config) {
-            return CM.overlayMode(CM.getMode(config, PLAIN_MODE), overlay(vocabulary));
-        });
-
         return true;
     }
 
-    // Which of the two the editor should be in, from the state of the pair of
-    // selectors the template form uses to say where the code lives. Absent
-    // selectors mean a CMS with no template-file engines at all, and then the
-    // code is in the database by definition.
+    // The mode the editor should be in, from the pair of selectors the template
+    // form uses to say where the code lives. Both places get the same mode: a
+    // .latte file and a database record run the same two parsers. What the
+    // selectors still decide is whether this is *our* code at all - a template
+    // pinned to .php or .css is somebody else's, and returning null leaves the
+    // mode the core chose for it.
     function wantedMode() {
         var source = document.getElementById('templatesource');
         var extension = document.getElementById('templatefileextension');
@@ -551,7 +544,7 @@ class TemplateEditor
             return MODE_DB;
         }
 
-        return extension && extension.value === CONFIG.fileExtension ? MODE_FILE : null;
+        return extension && extension.value === CONFIG.fileExtension ? MODE_DB : null;
     }
 
     // Puts the mode on, and keeps it on.

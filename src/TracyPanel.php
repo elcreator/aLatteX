@@ -16,22 +16,27 @@ use Tracy\IBarPanel;
  * started as a use of it. It is marked `@internal`, and the only constructor
  * that does not emit a deprecation is marked `@deprecated` besides, so building
  * on it means a Latte patch release can take the bar down on every site running
- * this plugin. What that panel offers over this one is a nesting tree. aLatteX
- * deliberately keeps a flat list instead: it reports every root, layout, file
- * and chunk partial with its total time without depending on Latte's internal
- * panel.
+ * this plugin. The panel is implemented against Tracy\IBarPanel instead, which
+ * carries no `@internal` and is two methods wide.
  *
- * So the panel is implemented against Tracy\IBarPanel instead, which carries no
- * `@internal` and is two methods wide. Everything else it touches - Dumper,
- * Helpers::editorLink - is optional and guarded, so a Tracy that moves them
- * costs a link or a dump rather than the request.
+ * It reports what one request rendered as a tree: the root template, whatever it
+ * extends, and every file or chunk partial included along the way, each with the
+ * relation that pulled it in and the time it took. That mattered less when
+ * aLatteX could only ever render one string; now that SourceLoader resolves
+ * `<alias>.latte` files and `chunk:` references, a page is routinely three
+ * templates deep and the shape is the first thing worth seeing.
+ *
+ * Everything outside Tracy\IBarPanel is optional and guarded - Dumper,
+ * Helpers::editorLink, and Latte's own getReferringTemplate()/getReferenceType()
+ * - so a version that moves any of them costs a link, a dump or the nesting
+ * rather than the request.
  *
  * See TracyBridge for what is still borrowed from Latte, and how.
  */
 final class TracyPanel implements IBarPanel
 {
     /**
-     * Dump the first template's parameters into the panel.
+     * Dump the root template's parameters into the panel.
      *
      * Off by default, and not a stylistic choice: aLatteX passes $evo, which is
      * the CMS core and through it the container, the database connection and the
@@ -40,25 +45,31 @@ final class TracyPanel implements IBarPanel
      */
     public bool $dumpParameters = false;
 
-    /** @var array<string, array{count: int, time: float}> keyed by template name */
-    private array $rows = [];
+    /**
+     * One entry per rendered Template instance, in the order they began.
+     *
+     * @var array<int, array{name: string, parent: int|null, type: string|null, time: float}>
+     */
+    private array $entries = [];
 
     /** @var array<int, int|float> spl_object_id => start time from hrtime() */
     private array $started = [];
 
-    /** @var array<string, mixed>|null the first template's parameters */
+    /** @var array<string, mixed>|null the root template's parameters */
     private ?array $parameters = null;
 
     public function addTemplate(Template $template): void
     {
-        $name = $template->getName();
+        $id = spl_object_id($template);
 
-        if (!isset($this->rows[$name])) {
-            $this->rows[$name] = ['count' => 0, 'time' => 0.0];
-        }
+        $this->entries[$id] = [
+            'name' => $template->getName(),
+            'parent' => $this->parentOf($template),
+            'type' => $this->relationOf($template),
+            'time' => 0.0,
+        ];
 
-        $this->rows[$name]['count']++;
-        $this->started[spl_object_id($template)] = hrtime(true);
+        $this->started[$id] = hrtime(true);
 
         if ($this->parameters === null) {
             $this->parameters = $template->getParameters();
@@ -69,11 +80,11 @@ final class TracyPanel implements IBarPanel
     {
         $id = spl_object_id($template);
 
-        if (!isset($this->started[$id])) {
+        if (!isset($this->started[$id], $this->entries[$id])) {
             return;
         }
 
-        $this->rows[$template->getName()]['time'] += (hrtime(true) - $this->started[$id]) / 1e9;
+        $this->entries[$id]['time'] += (hrtime(true) - $this->started[$id]) / 1e9;
         unset($this->started[$id]);
     }
 
@@ -85,29 +96,30 @@ final class TracyPanel implements IBarPanel
      */
     public function getTab(): ?string
     {
-        if (!$this->rows) {
+        if (!$this->entries) {
             return null;
         }
 
+        $count = count($this->entries);
+
         return '<span title="Templates rendered by aLatteX">'
-            . '<span class="tracy-label">aLatteX</span>'
-            . '</span>';
+            . '<span class="tracy-label">aLatteX'
+            . ($count > 1 ? ' (' . $count . ')' : '')
+            . '</span></span>';
     }
 
     public function getPanel(): ?string
     {
-        if (!$this->rows) {
+        if (!$this->entries) {
             return null;
         }
 
-        $out = '<h1>aLatteX</h1><div class="tracy-inner"><table>'
-            . '<tr><th>Template</th><th></th><th>time</th></tr>';
+        $out = self::style()
+            . '<h1>aLatteX</h1><div class="tracy-inner alx-panel"><table>'
+            . '<tr><th>Template</th><th></th><th class="alx-time">time</th></tr>';
 
-        foreach ($this->rows as $name => $row) {
-            $out .= '<tr><td>' . self::name($name) . '</td>'
-                . '<td>' . ($row['count'] > 1 ? self::escape((string) $row['count']) . '&times;' : '') . '</td>'
-                . '<td style="text-align:right">'
-                . self::escape(number_format($row['time'] * 1000, 1)) . ' ms</td></tr>';
+        foreach ($this->rows() as $row) {
+            $out .= $this->row($row);
         }
 
         $out .= '</table></div>';
@@ -127,10 +139,115 @@ final class TracyPanel implements IBarPanel
     }
 
     /**
+     * The entries as display rows, depth-first from each root.
+     *
+     * Instances sharing a parent *and* a name become one row with a count: a
+     * partial included in a loop is one thing included many times, and twenty
+     * identical rows would say less than one row saying twenty.
+     *
+     * @return list<array{name: string, type: string|null, depth: int, count: int, time: float}>
+     */
+    private function rows(): array
+    {
+        $children = [];
+
+        foreach ($this->entries as $id => $entry) {
+            $children[$entry['parent'] ?? 0][$entry['name']][] = $id;
+        }
+
+        $rows = [];
+        $listed = [];
+        $this->collect($children, 0, 0, $rows, $listed);
+
+        // A template whose parent was never recorded would otherwise vanish
+        // from the panel. It should not happen; if it ever does, showing it at
+        // the root beats losing it.
+        foreach ($this->entries as $id => $entry) {
+            if (!isset($listed[$id])) {
+                $rows[] = [
+                    'name' => $entry['name'],
+                    'type' => $entry['type'],
+                    'depth' => 0,
+                    'count' => 1,
+                    'time' => $entry['time'],
+                ];
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param array<int, array<string, list<int>>> $children
+     * @param list<array{name: string, type: string|null, depth: int, count: int, time: float}> $rows
+     * @param array<int, true> $listed
+     */
+    private function collect(array $children, int $parent, int $depth, array &$rows, array &$listed): void
+    {
+        foreach ($children[$parent] ?? [] as $name => $ids) {
+            $time = 0.0;
+
+            foreach ($ids as $id) {
+                $time += $this->entries[$id]['time'];
+                $listed[$id] = true;
+            }
+
+            $rows[] = [
+                'name' => $name,
+                'type' => $this->entries[$ids[0]]['type'],
+                'depth' => $depth,
+                'count' => count($ids),
+                'time' => $time,
+            ];
+
+            foreach ($ids as $id) {
+                $this->collect($children, $id, $depth + 1, $rows, $listed);
+            }
+        }
+    }
+
+    /** @param array{name: string, type: string|null, depth: int, count: int, time: float} $row */
+    private function row(array $row): string
+    {
+        $indent = $row['depth'] > 0
+            ? '<span class="alx-indent" style="width:' . ($row['depth'] * 12) . 'px"></span>&#9492; '
+            : '';
+
+        $relation = $row['type'] !== null && $row['type'] !== ''
+            ? '<span class="alx-rel">' . self::escape($row['type']) . '</span> '
+            : '';
+
+        return '<tr><td>' . $indent . $relation . self::name($row['name']) . '</td>'
+            . '<td>' . ($row['count'] > 1 ? self::escape((string) $row['count']) . '&times;' : '') . '</td>'
+            . '<td class="alx-time">' . self::escape(number_format($row['time'] * 1000, 1)) . ' ms</td></tr>';
+    }
+
+    /**
+     * Which template pulled this one in, and how. Both are public methods on a
+     * public Latte class, but the panel is a debugging aid: it asks rather than
+     * assumes, and degrades to a flat list if either ever goes away.
+     */
+    private function parentOf(Template $template): ?int
+    {
+        if (!method_exists($template, 'getReferringTemplate')) {
+            return null;
+        }
+
+        $parent = $template->getReferringTemplate();
+
+        return $parent === null ? null : spl_object_id($parent);
+    }
+
+    private function relationOf(Template $template): ?string
+    {
+        return method_exists($template, 'getReferenceType')
+            ? $template->getReferenceType()
+            : null;
+    }
+
+    /**
      * A template kept in a file is offered as an editor link; one kept in the
-     * database has no file to open, so it is printed as it is. Helpers is
-     * Tracy's and not marked internal, but it is a convenience either way -
-     * losing it costs the link, not the row.
+     * database, or a chunk, has no file to open and is printed as it is.
      */
     private static function name(string $name): string
     {
@@ -153,6 +270,17 @@ final class TracyPanel implements IBarPanel
         $options = defined(Dumper::class . '::LIVE') ? [Dumper::LIVE => true] : [];
 
         return Dumper::toHtml($value, $options);
+    }
+
+    private static function style(): string
+    {
+        return '<style class="tracy-debug">'
+            . '#tracy-debug .alx-panel td{white-space:nowrap}'
+            . '#tracy-debug .alx-time{text-align:right;font-variant-numeric:tabular-nums}'
+            . '#tracy-debug .alx-indent{display:inline-block}'
+            . '#tracy-debug .alx-rel{border-radius:2px;padding:1px 4px;font-size:80%;font-weight:bold;'
+            . 'color:#fff;background:#8250df}'
+            . '</style>';
     }
 
     private static function escape(string $value): string

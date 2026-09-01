@@ -49,6 +49,7 @@ final class DemoSeeder
 
         $categoryId = $this->categoryId();
 
+        $views = $this->installViews();
         $chunks = $this->installChunks($categoryId);
         $snippets = $this->installSnippets($categoryId);
         $templates = $this->installTemplates($categoryId);
@@ -56,17 +57,128 @@ final class DemoSeeder
         $documents = $this->installDocuments($templates, $tvs);
 
         $this->note(sprintf(
-            'Installed %d chunks, %d snippets, %d templates, %d TVs, %d documents.',
+            'Installed %d chunks, %d snippets, %d templates, %d TVs, %d documents, %d view files.',
             count($chunks),
             count($snippets),
             count($templates),
             count($tvs),
             count($documents),
+            count($views),
         ));
 
         $this->clearCache();
 
         return $this->log;
+    }
+
+    /**
+     * Writes the layout files into the site's views/ directory.
+     *
+     * The one part of the set that touches the filesystem, because a template
+     * reference resolves to a file and a layout that is not one cannot be
+     * extended. Everything else here is a database record.
+     *
+     * A file that is already there and does not match what the demo ships is
+     * left alone and reported: it is somebody's own layout that happens to
+     * share a name, and overwriting it would be the installer destroying work
+     * it did not create. That is the same rule the rest of the seeder follows
+     * by addressing elements by name.
+     *
+     * @return list<string> the files written
+     */
+    private function installViews(): array
+    {
+        $directory = $this->viewsDirectory();
+
+        if ($directory === null) {
+            $this->note('no views directory configured; layout files skipped');
+
+            return [];
+        }
+
+        $written = [];
+
+        foreach (DemoContent::views() as $view) {
+            $target = $directory . DIRECTORY_SEPARATOR . $view['target'];
+
+            if (is_file($target) && file_get_contents($target) !== $view['body']) {
+                $this->note('kept     ' . $view['target'] . ' (already there, and changed)');
+
+                continue;
+            }
+
+            if (!is_dir($directory) && !@mkdir($directory, 0775, true) && !is_dir($directory)) {
+                $this->note('could not create ' . $directory);
+
+                return $written;
+            }
+
+            if (file_put_contents($target, $view['body']) === false) {
+                $this->note('could not write ' . $target);
+
+                continue;
+            }
+
+            $written[] = $view['target'];
+            $this->note('view     ' . $view['target']);
+        }
+
+        return $written;
+    }
+
+    /**
+     * Deletes only the layout files still byte-identical to what was installed.
+     *
+     * An edited file is somebody's work now, whoever put it there, so it stays
+     * and is reported.
+     */
+    private function removeViews(): void
+    {
+        $directory = $this->viewsDirectory();
+
+        if ($directory === null) {
+            return;
+        }
+
+        $removed = 0;
+
+        foreach (DemoContent::views() as $view) {
+            $target = $directory . DIRECTORY_SEPARATOR . $view['target'];
+
+            if (!is_file($target)) {
+                continue;
+            }
+
+            if (file_get_contents($target) !== $view['body']) {
+                $this->note('kept     ' . $view['target'] . ' (edited since install)');
+
+                continue;
+            }
+
+            if (@unlink($target)) {
+                $removed++;
+            }
+        }
+
+        $this->note('removed ' . $removed . ' view files');
+    }
+
+    /**
+     * Where the CMS looks for view files. The first configured path, which on a
+     * stock install is EVO_BASE_PATH . 'views/' - the same directory the
+     * manager scaffolds a template file into.
+     */
+    private function viewsDirectory(): ?string
+    {
+        $paths = function_exists('config') ? (array) config('view.paths', []) : [];
+
+        foreach ($paths as $path) {
+            if (is_string($path) && $path !== '') {
+                return rtrim($path, "/\\");
+            }
+        }
+
+        return defined('EVO_BASE_PATH') ? EVO_BASE_PATH . 'views' : null;
     }
 
     /** @return array<string, int> name => id */
@@ -343,6 +455,7 @@ final class DemoSeeder
             $this->note('removed ' . $count . ' ' . $label);
         }
 
+        $this->removeViews();
         $this->removeCategoryIfEmpty();
         $this->clearCache();
 

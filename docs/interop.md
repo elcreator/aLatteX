@@ -388,12 +388,37 @@ because every demo page is cacheable.
 ## Rendering from a `.latte` file
 
 If a template's alias resolves to `views/<alias>.latte`, the CMS renders that
-file through `LatteViewEngine` and **skips its own parser entirely** - the same
-way it treats `.blade.php`. EVO tags left in such a file stay literal, because
-nothing runs `parseDocumentSource()` on the result.
+file through `LatteViewEngine`. **It behaves exactly like the same code kept in
+the database** - same Latte, same EVO tags, same output. Where a template lives
+is a version-control decision, not a syntax one.
 
-The demo deliberately leaves `templatealias` empty on every template, so all of
-it goes through the database path documented above.
+That takes work, because the core does not treat the two the same. `Core.php`
+branches on whether a view file was found:
+
+```php
+$template = TemplateProcessor::getBladeDocumentContent();   // truthy iff a view file exists
+...
+$this->invokeEvent('OnLoadWebDocument');
+
+if (!$template) {
+    $this->documentContent = $this->parseDocumentSource($this->documentContent);
+}
+...
+$template ? $this->outputContent(false, false) : $this->outputContent();
+```
+
+A view-rendered document therefore skips `parseDocumentSource()`, the `[!…!]`
+pass, `cleanUpMODXTags()` and `rewriteUrls()` - every EVO tag in it would reach
+the page as text. `alattexFinishViewRender()` in `plugins/aLattexPlugin.php`
+runs those passes, in the core's order and with the core's own methods, for
+`.latte` views only. A `.blade.php` template reaches the same branch and keeps
+the core's behaviour; that is Blade's contract with the CMS to change, not this
+plugin's.
+
+**One difference is left, and cannot be closed from a plugin.** The same branch
+forces `cacheable = 0` and never registers `postProcess()`, so a view-rendered
+document is not written to Evolution's page cache. It renders identically; it
+just renders every time.
 
 ---
 

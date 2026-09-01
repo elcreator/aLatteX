@@ -70,6 +70,45 @@ sent to the recycle bin, so a later reinstall does not collide with them.
 
 ---
 
+## Layouts, and why they are files
+
+Two of the templates do not hold a whole page. They name a layout instead:
+
+```latte
+{extends 'base.latte'}
+{block content} ... {/block}
+```
+
+A template reference resolves to a flat `<name>.latte` under Evolution's view
+paths - `views/` on a stock install - so a layout has to be a **file**. A layout
+kept in the database cannot be extended, because there is nothing to resolve the
+name against. That is why `demo:install` writes two files into `views/`, and the
+only place in the set where it touches the filesystem.
+
+It writes carefully. A file already there whose contents differ from what the
+demo ships is left alone and reported, because it is somebody's own layout that
+happens to share a name; `demo:remove` deletes only the files still identical to
+what it installed, and reports the ones it kept.
+
+Neither layout carries a `templatealias`, so the CMS never renders one as a
+document on its own - they exist only as the parent of something that extends
+them. That is worth knowing before naming a layout: a `views/base.latte` would
+*also* become the template file for any template aliased `base`.
+
+The chain runs three deep, because two levels would not show that each level
+only ever names the one above it:
+
+```
+views/base.latte            doctype, header, footer, the blocks everything fills
+    └ views/base-article.latte   the shape shared by one kind of page
+        └ "aLatteX Demo: Extends, article"   a record in the database
+```
+
+Switch Tracy on and the aLatteX panel shows exactly that tree, with the relation
+that pulled each level in and what each cost.
+
+---
+
 ## The pages
 
 | Page | Template | What it proves |
@@ -79,6 +118,8 @@ sent to the recycle bin, so a later reinstall does not collide with them.
 | `/alattex-evo` | `evo-syntax.latte` | All six EVO tag forms verbatim, then the same six through the `evo*` Latte functions, then a snippet call assembled inside a `{foreach}`. |
 | `/alattex-chunks` | `chunks-and-snippets.latte` | Why Latte in an ordinary chunk prints literally, and the explicit ways round it. |
 | `/alattex-raw` | `raw-output.latte` | `{syntax off}`, `{l}`/`{r}`, escaping contexts, and the fact that none of it stops the CMS parser. Plus the two brace traps. |
+| `/alattex-extends-page` | `extends-page.latte` | A database template extending `views/base.latte`: the record holds what is particular to the page, the file holds what every page shares. |
+| `/alattex-extends-article` | `extends-article.latte` | Three levels - `base.latte`, `base-article.latte`, then the record - plus `{include parent}` and a chunk partial at the bottom of the chain. |
 | `/alattex-tvs` | `tvs-and-fields.latte` | Document fields, three TV types, `$documentObject` and `$evo` as Latte values. |
 
 ### What is in a page's own content
@@ -117,6 +158,12 @@ Every page carries two blocks in its content field, on top of its introduction:
 | `aLatteXDemoNested` | Returns EVO tags *and* calls `runSnippet()`: both ways of nesting. |
 | `aLatteXDemoRows` | Returns an **array** of documents, for the template to loop over during the Latte pass. |
 
+| View file | Point |
+| --- | --- |
+| `views/base.latte` | The layout. Declares the blocks two templates fill, and holds the markup every page shares. |
+| `views/base-article.latte` | Extends `base.latte` and is extended in turn - the middle of the three-level chain. |
+
+
 | TV | Type | Point |
 | --- | --- | --- |
 | `alxSubtitle` | text | The same value read three ways. |
@@ -134,6 +181,7 @@ demo/
   snippets/*.php      stored with their <?php opener, which the CMS strips
   templates/*.latte
   documents/*.html    the content field of each page
+  views/*.latte       the layouts, copied into the site's views/ on install
 ```
 
 `manifest.php` is the join: a document names its template, a TV names the

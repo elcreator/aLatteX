@@ -21,6 +21,11 @@ bin/
 demo/
   manifest.php             The demo set as data: names, relationships, metadata
   chunks/ snippets/ templates/ documents/   One file per element body
+  views/                    The layouts. The only part of the set that is a file on the site, because
+                            {extends} resolves a name to a file - a layout in the database cannot be
+                            extended. DemoSeeder writes them into config('view.paths')[0] on install,
+                            skips one already there whose contents differ, and on remove deletes only
+                            the files still identical to what it wrote.
 docs/                      User- and agent-facing syntax reference
 patches/                   Fixes that belong in the CMS, kept until they are upstream
 plugins/
@@ -202,7 +207,7 @@ Snippet parameters: `[[name?&key=\`value\`&key2=\`value2\`]]`
 ## What not to do
 
 - Do not edit anything under `vendor/` or `tmp/`.
-- Do not call `evo()->parseDocumentSource()` from within the plugin — it runs automatically after `OnLoadWebDocument` completes.
+- Do not call `evo()->parseDocumentSource()` on a template held in the database — the core runs it automatically once `OnLoadWebDocument` completes, and a second call parses the page twice. The exception is the view-file path, where the core's `if (!$template)` gate means it never runs at all: `alattexFinishViewRender()` does it there, and only there, so a template moved into `views/<alias>.latte` keeps its meaning.
 - Do not add a second `protect()`/`restore()` cycle. `EvoSyntaxBridge` accumulates
   tokens from every source in one top-level render: `beginRender()` resets the
   map once, while each loader `getContent()` protects and adds to it. Resetting

@@ -100,11 +100,14 @@ class LattexEngine
     /**
      * Render a .latte file for Laravel's view factory.
      *
-     * Unlike render(), the result is final: a document rendered from a view
-     * file never reaches parseDocumentSource(), so EVO tags left in the output
-     * stay literal - exactly as they do in a .blade.php file today. They are
-     * still protected during the Latte pass so that a stray brace in EVO syntax
-     * cannot abort compilation.
+     * EVO tags are protected during the Latte pass, the same as in render(),
+     * and restored afterwards. The core would then leave them as text - it
+     * skips parseDocumentSource() for a view-rendered document - so the plugin
+     * runs those passes itself once the view is back; see
+     * alattexFinishViewRender() in plugins/aLattexPlugin.php. The effect is
+     * that a template kept in views/<alias>.latte behaves exactly like the same
+     * code kept in the database, which is the point: where a template lives is
+     * a version-control decision, not a syntax one.
      *
      * @param  string               $path    Absolute path to the .latte file
      * @param  array<string, mixed> $data    View data shared by the CMS

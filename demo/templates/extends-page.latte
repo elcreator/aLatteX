@@ -1,0 +1,42 @@
+{*
+   aLatteX Demo: Extends, page - a database template that extends a file.
+
+   Two levels: this record, and base.latte in /views/. That is the whole of it -
+   the template stays where a CMS template belongs, editable in the manager, and
+   the markup every page shares lives in one file under version control.
+
+   Blocks are the interface between them. base.latte declares title, bodyClass,
+   crumbs, content, aside and foot; this fills the ones it cares about and
+   inherits the rest, so a page that needs nothing special says nothing.
+*}
+{extends 'base.latte'}
+
+{block title}{$pagetitle} (extended){/block}
+
+{block bodyClass}alx-base alx-page{/block}
+
+{block content}
+    <h1>{$pagetitle}</h1>
+
+    <p>
+        This template is a record in <code>site_templates</code>. Everything
+        around it - the doctype, the header chunk, the footer - comes from
+        <code>base.latte</code>, which it names with
+        <code>&#123;extends 'base.latte'&#125;</code>.
+    </p>
+
+    <p>
+        EVO tags work in both halves. This one is in the child:
+        <strong>[*pagetitle*]</strong>, and the setting in the layout's
+        <code>&lt;title&gt;</code> is <strong>[(site_name)]</strong>. The page
+        goes through parseDocumentSource() after Latte either way, so where a
+        tag was written makes no difference to whether it resolves.
+    </p>
+
+    <p>Document content, below the template's own markup:</p>
+    <div class="alx-content">[*content*]</div>
+{/block}
+
+{block aside}
+    <p>Aside replaced by the child. base.latte's default is gone.</p>
+{/block}

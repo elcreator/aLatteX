@@ -147,6 +147,29 @@ return [
     ],
 
     /*
+     * View files. The only thing in this set that is not a database record,
+     * because it cannot be: SourceLoader resolves a template reference to a
+     * flat <name>.latte under Evolution's view paths, so a layout has to be a
+     * file for anything to be able to extend it.
+     *
+     * 'target' is the name inside views/, and therefore the name a template
+     * writes in {extends '...'}. Neither carries a templatealias, so the CMS
+     * never renders them as documents in their own right.
+     */
+    'views' => [
+        [
+            'target' => 'base.latte',
+            'description' => 'The demo layout. Extended by two templates, one of them through base-article.',
+            'file' => 'views/base.latte',
+        ],
+        [
+            'target' => 'base-article.latte',
+            'description' => 'Extends base.latte and is extended in turn - the middle of the three-level chain.',
+            'file' => 'views/base-article.latte',
+        ],
+    ],
+
+    /*
      * Templates. templatealias is deliberately left empty: an alias that
      * resolves to a file under views/ makes the CMS render that file instead,
      * and the whole point of the demo is templates held in the database.
@@ -156,6 +179,16 @@ return [
             'name' => 'aLatteX Demo: Home',
             'description' => 'Index page. One layout defined with {define}, filled per section.',
             'file' => 'templates/home.latte',
+        ],
+        [
+            'name' => 'aLatteX Demo: Extends, page',
+            'description' => 'A database template extending base.latte - two levels.',
+            'file' => 'templates/extends-page.latte',
+        ],
+        [
+            'name' => 'aLatteX Demo: Extends, article',
+            'description' => 'base.latte -> base-article.latte -> this record - three levels.',
+            'file' => 'templates/extends-article.latte',
         ],
         [
             'name' => 'aLatteX Demo: Latte basics',
@@ -258,6 +291,34 @@ return [
             'tvs' => [
                 'alxSubtitle' => 'syntax off, and what it does not cover',
                 'alxTags' => 'raw||latte',
+            ],
+        ],
+        [
+            'alias' => 'alattex-extends-page',
+            'pagetitle' => 'Extending a layout',
+            'longtitle' => 'A database template extending a file in views/',
+            'menutitle' => 'Extends',
+            'template' => 'aLatteX Demo: Extends, page',
+            'parent' => 'alattex-demo',
+            'isfolder' => false,
+            'file' => 'documents/extends-page.html',
+            'tvs' => [
+                'alxSubtitle' => 'Two levels: the record and base.latte',
+                'alxTags' => 'latte',
+            ],
+        ],
+        [
+            'alias' => 'alattex-extends-article',
+            'pagetitle' => 'Three levels deep',
+            'longtitle' => 'base.latte, base-article.latte, and a template in the database',
+            'menutitle' => 'Extends x3',
+            'template' => 'aLatteX Demo: Extends, article',
+            'parent' => 'alattex-demo',
+            'isfolder' => false,
+            'file' => 'documents/extends-article.html',
+            'tvs' => [
+                'alxSubtitle' => 'A layout, a middle layer, and a record',
+                'alxTags' => 'latte||demo',
             ],
         ],
         [

@@ -40,7 +40,7 @@ final class DemoContent
             throw new RuntimeException('demo/manifest.php must return an array.');
         }
 
-        foreach (['chunks', 'snippets', 'templates', 'documents'] as $section) {
+        foreach (['chunks', 'snippets', 'templates', 'documents', 'views'] as $section) {
             foreach ($manifest[$section] as $i => $entry) {
                 $manifest[$section][$i]['body'] = self::read($dir, $entry['file']);
             }
@@ -77,6 +77,20 @@ final class DemoContent
     public static function documents(): array
     {
         return self::all()['documents'];
+    }
+
+    /**
+     * The layout files the set installs into the site's views/ directory.
+     *
+     * The only part of the demo that is not a database record. A template
+     * reference resolves to a flat <name>.latte under Evolution's view paths,
+     * so a layout has to be a file before anything can extend it.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function views(): array
+    {
+        return self::all()['views'] ?? [];
     }
 
     public static function category(): string

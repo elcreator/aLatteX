@@ -164,3 +164,14 @@ test('the overlay carries state, so a tag may span lines', function (): void {
     // delimiter, and picked up again on the next line.
     assertStringContains('state.open = { closer: closer, style: style }', $script);
 });
+
+test('a file template is coloured like a database one', function (): void {
+    $script = templateEditorScript();
+
+    // A .latte file and a site_templates row run the same two parsers, so the
+    // editor gives them the same mode. It used to hand the file a Latte-only
+    // mode, on the reasoning that EVO tags in a view file stay literal - which
+    // stopped being true when the plugin took over the passes the core skips.
+    assertStringNotContains('alattex-latte', $script);
+    assertStringContains("var MODE_DB = 'alattex-template'", $script);
+});

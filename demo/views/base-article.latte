@@ -1,0 +1,42 @@
+{*
+   base-article.latte - the middle of the chain.
+
+   It extends base.latte and is extended in turn by a template held in the
+   database, which makes the demo three levels deep:
+
+       base.latte  <-  base-article.latte  <-  "aLatteX Demo: Extends, article"
+
+   Nothing about the middle is special to Latte - a parent is just a template
+   that happens to extend another one - but it is the level where a real site
+   puts the shape shared by one *kind* of page, with base.latte holding what
+   every page shares.
+
+   {include parent} is the tag worth reading here: it renders the block as the
+   parent defined it and adds to it, rather than replacing it. base.latte's
+   crumbs survive, with this level appended.
+*}
+{extends 'base.latte'}
+
+{block bodyClass}alx-base alx-article{/block}
+
+{block crumbs}
+    {include parent} / <span class="alx-dim">article</span>
+{/block}
+
+{block content}
+    <article class="alx-article-body">
+        <header>
+            <h1>{block heading}{$pagetitle}{/block}</h1>
+            <p class="alx-dim">{block standfirst}An article laid out by base-article.latte.{/block}</p>
+        </header>
+
+        {block body}
+            <p>base-article.latte defines the frame; the child fills the body.</p>
+        {/block}
+    </article>
+{/block}
+
+{block aside}
+    <p>Article aside, from base-article.latte.</p>
+    {block asideExtra}{/block}
+{/block}

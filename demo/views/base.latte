@@ -1,0 +1,57 @@
+{*
+   base.latte - the demo's layout, and the grandparent of the chain.
+
+   It lives in /views/ because that is the only place aLatteX resolves a
+   template reference from: SourceLoader takes a flat <name>.latte and looks for
+   it in Evolution's configured view paths. A layout kept in the database cannot
+   be extended, because there is nothing to resolve a name against.
+
+   Note what is *not* here: a templatealias. A template record aliased "base"
+   would make the CMS render this file directly for its documents, blocks and
+   all. It is a layout, so it has none, and the CMS never renders it on its own
+   - only as the parent of something that extends it.
+
+   EVO tags below are deliberate, and they resolve however this layout was
+   reached - from a template held in the database, or from one held in a file.
+   The core skips its parser for a view-rendered document; aLatteX runs those
+   passes itself so the two are the same. See docs/interop.md.
+*}
+<!doctype html>
+<html lang="{evoSetting('manager_language')}">
+<head>
+    <meta charset="utf-8">
+    <title>{block title}{$pagetitle}{/block} - [(site_name)]</title>
+</head>
+<body class="alx alx-layout {block bodyClass}alx-base{/block}">
+
+{{aLatteXDemoHeader}}
+
+<p class="alx-crumbs">
+    {block crumbs}
+        <a href="[~1~]">Home</a> / {$pagetitle}
+    {/block}
+</p>
+
+<main class="alx-main">
+    {block content}
+        <p class="alx-empty">
+            base.latte on its own. A child template fills this in.
+        </p>
+    {/block}
+</main>
+
+<aside class="alx-aside">
+    {block aside}
+        <p>Default aside, from base.latte.</p>
+    {/block}
+</aside>
+
+<footer class="alx-foot">
+    {block foot}Rendered by base.latte{/block}
+    - {{aLatteXDemoBadge}}
+</footer>
+
+{{aLatteXDemoFooter}}
+
+</body>
+</html>

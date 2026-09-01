@@ -271,9 +271,11 @@ Switch it on in `core/config/tracy.php`:
 
 Then a front-end page rendered through aLatteX gets:
 
-- **an `aLatteX` panel on the bar**, listing every template the request
-  rendered and how long each took - a template kept in a file is a link that
-  opens it in your editor;
+- **an `aLatteX` panel on the bar**, showing what the request rendered as a
+  tree - the root template, whatever it extends, and every file or chunk
+  partial included along the way, each with the relation that pulled it in and
+  what it cost. A template kept in a file is a link that opens it in your
+  editor;
 - **`{dump $var}`**, which sends a value to Tracy's dump panel, and
   `{dump}` on its own, which sends all of them;
 - **a BlueScreen that knows Latte**, for a template kept in a file: a compile

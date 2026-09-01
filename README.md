@@ -39,9 +39,9 @@ Then open **System Settings → Site** and select **aLatteX** in the *Chunk proc
 
 ## Demo content
 
-A working example of every construct above — six pages, six templates, five
-chunks, five snippets and three template variables — can be installed into the
-site:
+A working example of every construct above — eight pages, eight templates, six
+chunks, five snippets, three template variables and two layout files — can be
+installed into the site:
 
 ```bash
 composer demo:install     # or: cd core && php artisan alattex:demo:install
@@ -151,7 +151,7 @@ The template form's **Template code** switch has three settings:
 | *In a file* | `views/<templatealias>.latte`, edited wherever you edit code |
 | *Automatic* | the file if one matches the alias, the database otherwise (the default) |
 
-Choosing *In a file* with **Latte (.latte)** scaffolds the file and hands rendering to this plugin's view engine. Both routes protect EVO-looking syntax while Latte runs. A database template subsequently reaches Evolution's parser; a file template is already the final view, so restored EVO tags in it stay literal.
+Choosing *In a file* with **Latte (.latte)** scaffolds the file and hands rendering to this plugin's view engine. The two routes are otherwise the same: same Latte, same EVO tags, same output. The core skips its parser for a view-rendered document, so aLatteX runs those passes itself - see [docs/interop.md](docs/interop.md#rendering-from-a-latte-file). The one thing a file template does not get is Evolution's page cache, which that code path never writes.
 
 The switch and the engine dropdown need Evolution CMS 3.5.9 or newer. On older cores a template whose alias matches `views/<alias>.latte` is still rendered from that file — the CMS has always preferred a matching view — there is simply no UI for creating one.
 
@@ -272,9 +272,9 @@ Selecting **aLatteX** and saving enables Latte template processing site-wide.
 With aLatteX active, the manager's template editor understands Latte as well as
 EVO tags. It is the CMS's own CodeMirror, with a second overlay layered on the
 one the core installs - tags, `{$variables}`, filters, `n:attributes` and
-`{* comments *}` are coloured alongside `{{chunks}}` and `[[snippets]]`, and a
-template kept in `views/<alias>.latte` is coloured as pure Latte, because EVO
-tags in a view file stay literal.
+`{* comments *}` are coloured alongside `{{chunks}}` and `[[snippets]]` - in a
+template kept in `views/<alias>.latte` exactly as in one kept in the database,
+because the two run the same two parsers.
 
 A tag is read in two registers. The structure Latte owns - the braces, the tag
 name, filters, function calls - is in the plugin's own colour; the expression
@@ -308,7 +308,7 @@ aLatteX/
 │   └── alattex-demo.php            composer demo:install / demo:remove → artisan
 ├── demo/                           the demo set: manifest plus one file per element
 │   ├── manifest.php
-│   ├── chunks/  snippets/  templates/  documents/
+│   ├── chunks/  snippets/  templates/  documents/  views/
 ├── docs/                           syntax reference and interop notes
 ├── patches/                        fixes that belong in the CMS, until they land there
 ├── plugins/

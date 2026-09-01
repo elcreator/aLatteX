@@ -1,0 +1,53 @@
+{*
+   aLatteX Demo: Extends, article - the deep end of the chain.
+
+       base.latte  <-  base-article.latte  <-  this record
+
+   Three levels, and nothing here knows about base.latte. It names its parent
+   and fills the blocks that parent declared; the grandparent's markup arrives
+   because base-article.latte extends it in turn. Latte resolves the chain at
+   render time, loading each template separately - which is why editing
+   base.latte changes this page without anything else being touched, and why
+   Tracy's aLatteX panel shows all three with the relation that pulled each in.
+
+   {include parent} appears twice on this page: once in base-article.latte's
+   crumbs, and once below, where the child adds to the parent's aside rather
+   than replacing it.
+*}
+{extends 'base-article.latte'}
+
+{block title}{$pagetitle} (three levels){/block}
+
+{block bodyClass}alx-base alx-article alx-deep{/block}
+
+{block standfirst}
+    A template three levels deep, and the middle one is a file too.
+{/block}
+
+{block body}
+    <p>
+        The chain is <code>base.latte</code> &rarr;
+        <code>base-article.latte</code> &rarr; this template. Each level only
+        names the one above it.
+    </p>
+
+    <ul>
+        <li>The doctype, header and footer come from <code>base.latte</code>.</li>
+        <li>The article frame comes from <code>base-article.latte</code>.</li>
+        <li>This text, and the aside below, come from the database.</li>
+    </ul>
+
+    <p>
+        A chunk partial still works at this depth, on top of the two layouts:
+    </p>
+    {include 'chunk:aLatteXDemoPartial', title: 'Included three levels down', items: ['base', 'base-article', 'this template']}
+
+    <div class="alx-content">[*content*]</div>
+{/block}
+
+{block asideExtra}
+    <p>
+        Added by the child through <code>&#123;block asideExtra&#125;</code>,
+        which base-article.latte left empty for exactly this.
+    </p>
+{/block}
