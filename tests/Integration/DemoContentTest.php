@@ -67,7 +67,7 @@ function requireLatte(): void
 }
 
 test('the demo manifest describes a complete, self-consistent set', function (): void {
-    assertSame(5, count(DemoContent::chunks()));
+    assertSame(6, count(DemoContent::chunks()));
     assertSame(5, count(DemoContent::snippets()));
     assertSame(3, count(DemoContent::tvs()));
     assertSame(6, count(DemoContent::templates()));
@@ -175,6 +175,18 @@ test('a chunk of Latte source stays literal until something renders it', functio
 
     // The pass that does compile it is a snippet call, left for the CMS.
     assertStringContains('[[aLatteXDemoLatte?', $rendered);
+});
+
+test('a chunk can be an explicitly rendered Latte partial', function (): void {
+    requireLatte();
+
+    $rendered = renderDemoDocument('alattex-basics');
+
+    assertStringContains('<h4>Chunk-backed partial</h4>', $rendered);
+    foreach (['Latte,', 'Evo,', 'Demo'] as $item) {
+        assertStringContains($item, $rendered);
+    }
+    assertStringNotContains('{$title}', $rendered);
 });
 
 test('a snippet can hand a template data to loop over', function (): void {

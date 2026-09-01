@@ -169,9 +169,9 @@ final class FakeEvolutionCore
         return $this->config[$name] ?? null;
     }
 
-    public function getChunk(string $name): string
+    public function getChunk(string $name): ?string
     {
-        return $this->chunks[$name] ?? '';
+        return $this->chunks[$name] ?? null;
     }
 
     /**

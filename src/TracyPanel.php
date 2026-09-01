@@ -16,11 +16,10 @@ use Tracy\IBarPanel;
  * started as a use of it. It is marked `@internal`, and the only constructor
  * that does not emit a deprecation is marked `@deprecated` besides, so building
  * on it means a Latte patch release can take the bar down on every site running
- * this plugin. What that panel offered over this one was a nesting tree, which
- * aLatteX cannot produce anyway: {include 'file'}, {extends}, {embed} and
- * {import} all need a second template to resolve a name against, and aLatteX
- * renders one string through a loader that holds one. A flat list is the whole
- * truth here.
+ * this plugin. What that panel offers over this one is a nesting tree. aLatteX
+ * deliberately keeps a flat list instead: it reports every root, layout, file
+ * and chunk partial with its total time without depending on Latte's internal
+ * panel.
  *
  * So the panel is implemented against Tracy\IBarPanel instead, which carries no
  * `@internal` and is two methods wide. Everything else it touches - Dumper,

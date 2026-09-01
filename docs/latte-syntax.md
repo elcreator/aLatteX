@@ -153,17 +153,32 @@ Any tag that wraps content has an `n:` form that lives on the element instead:
 
 ---
 
-## Blocks
+## Blocks, layouts and partials
 
-Blocks are local to the template. There is no cross-template inheritance:
-`{extends}`, `{layout}` and `{include 'other.latte'}` have nothing to resolve
-against, because aLatteX renders through Latte's `StringLoader` - it hands the
-engine the template's source, not a path. That is true of a file template as
-well as a database one: `views/<alias>.latte` is read and rendered as a string,
-so putting a template in a file buys version control, not `{extends}`.
+Cross-template references have two explicit namespaces:
 
-`{define}` and `{include name}` within one template cover what a CMS template
-usually wants from inheritance, and a shared fragment is what chunks are for.
+```latte
+{layout 'base.latte'}
+{include 'navigation.latte'}
+{include 'chunk:ProductCard', product: $product, featured: true}
+```
+
+A file name is flat and resolves under Evolution's configured `views/`
+directory. It must have the same shape as a template alias followed by
+`.latte`: letters, numbers, `_` and `-`, with no directory or `..` segments.
+The manager can therefore own a layout in exactly the same way as a page
+template: make a non-selectable template with alias `base`, choose **file** and
+**Latte**, and its editor writes `views/base.latte`.
+
+`chunk:` opts one CMS chunk into Latte rendering. Its contents are compiled as
+a child template and arguments are ordinary Latte variables. This is distinct
+from `{{ProductCard}}` and `{evoChunk('ProductCard')}`, which retain their EVO
+meaning and do not run Latte over the chunk.
+
+All of Latte's relationships use the same loader, so `{extends}`, `{layout}`,
+file `{include}`, `{import}` and file `{embed}` work with flat files and with
+the explicit `chunk:` namespace. `{define}` and block `{include}` remain useful
+for fragments local to one source:
 
 ```latte
 {define layout, string $title, array $pages}
@@ -226,7 +241,7 @@ expression (`count()`, `implode()`, `in_array()`, …).
 
 | Feature | Why |
 | --- | --- |
-| `{layout}`, `{extends}`, `{import}`, `{embed}`, `{sandbox}`, `{include 'file.latte'}` | aLatteX renders one template at a time from a string, so there is no directory to resolve a second name against. Blocks defined in the same template work; inheritance across templates does not. |
+| `{sandbox}` | Resolving a source is not a security policy. aLatteX does not configure Latte's `Policy`, so sandboxed rendering stays unavailable. |
 | `{syntax double}` | Its delimiter is `{{…}}`, which is how Evolution CMS spells a chunk. aLatteX tokenises those before Latte sees them. |
 | `{cache}` | Needs `nette/caching`. Use the CMS's own page cache instead - see [interop.md](interop.md#caching). |
 | `|webalize`, `|localDate`, `{translate}` | Need `nette/utils`, `ext-intl` and a translator respectively; none is a dependency of this plugin. |

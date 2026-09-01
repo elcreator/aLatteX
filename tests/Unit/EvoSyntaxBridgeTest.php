@@ -168,16 +168,39 @@ test('element names are recognised the same way the patterns match them', functi
     }
 });
 
-test('resets token map between render calls', function (): void {
+test('accumulates sources within a render and resets between renders', function (): void {
     $bridge = new EvoSyntaxBridge();
 
+    $bridge->beginRender();
     $first = $bridge->protect('{{header}} [[Menu]]');
     assertSame('{{header}} [[Menu]]', $bridge->restore($first));
 
+    // A second source belongs to the same render, so restoring their combined
+    // output must know both token maps.
     $second = $bridge->protect('<main>[*content*]</main>');
-    assertSame('<main>[*content*]</main>', $bridge->restore($second));
+    assertSame(
+        '{{header}} [[Menu]]<main>[*content*]</main>',
+        $bridge->restore($first . $second),
+    );
 
+    $bridge->beginRender();
     $third = $bridge->protect('[+notice+]');
     assertSame(1, preg_match('/^__ALATTEX_[0-9a-f]{16}_0__$/D', $third));
     assertSame('[+notice+]', $bridge->restore($third));
+    assertSame($first, $bridge->restore($first), 'The preceding render map must have been dropped.');
+});
+
+test('a source cache identity does not depend on what was protected before it', function (): void {
+    $source = '<aside>{{panel}} [*pagetitle*]</aside>';
+
+    $alone = new EvoSyntaxBridge();
+    $alone->beginRender();
+    $first = $alone->protect($source);
+
+    $afterAnotherSource = new EvoSyntaxBridge();
+    $afterAnotherSource->beginRender();
+    $afterAnotherSource->protect('[[SomethingElse]] [+notice+]');
+    $second = $afterAnotherSource->protect($source);
+
+    assertSame($first, $second);
 });

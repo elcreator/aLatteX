@@ -57,6 +57,11 @@ return [
             'description' => 'Latte source in a chunk. Literal unless rendered by aLatteXDemoLatte.',
             'file' => 'chunks/card.html',
         ],
+        [
+            'name' => 'aLatteXDemoPartial',
+            'description' => 'A chunk explicitly included as a Latte partial, with native arguments.',
+            'file' => 'chunks/partial.html',
+        ],
     ],
 
     /*
@@ -154,7 +159,7 @@ return [
         ],
         [
             'name' => 'aLatteX Demo: Latte basics',
-            'description' => 'Latte 3 in full - tags, filters, n:attributes, blocks, loops.',
+            'description' => 'Latte 3 in full, plus a CMS chunk rendered explicitly as a partial.',
             'file' => 'templates/basics.latte',
         ],
         [

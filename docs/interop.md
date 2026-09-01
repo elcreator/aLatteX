@@ -55,7 +55,7 @@ as in a template:
 
 What does *not* happen is Latte. A chunk called from the content field is
 inserted as markup, so Latte syntax in the chunk reaches the page verbatim -
-the same rule as a chunk called from a template, and with the same three ways
+the same rule as a chunk called from a template, and with the same four ways
 out below. Nothing about being called from the content changes it: Latte
 finished before either the content or the chunk existed on the page.
 
@@ -89,9 +89,33 @@ fourteen characters on the page - and this is true whether you include it with
 `{{chunkName}}` or with `{evoChunk('chunkName')}`, because `evoChunk()` returns
 the chunk's markup rather than compiling it.
 
-Three ways out, best first.
+Four ways out, best first.
 
-### 1. Keep the logic in the template
+### 1. Include the chunk explicitly as a Latte partial
+
+Prefixing the source name with `chunk:` asks aLatteX's loader for the chunk and
+compiles it as a child template:
+
+```latte
+{include 'chunk:ProductCard', title: $pagetitle, tags: $tags}
+```
+
+Inside `ProductCard`, those are normal Latte variables:
+
+```latte
+<article>
+    <h3>{$title}</h3>
+    <span n:foreach="$tags as $tag">{$tag}</span>
+</article>
+```
+
+The prefix is the opt-in. `{{ProductCard}}` and `{evoChunk('ProductCard')}`
+still insert the ordinary chunk for Evolution's later pass and leave any Latte
+source in it literal. A chunk editor whose chunk is referenced through
+`chunk:` is effectively editing template code; see [Where the guarantee
+stops](#where-the-guarantee-stops).
+
+### 2. Keep the logic in the template
 
 Usually the right answer. Latte does the loop, the chunk stays the lump of
 markup a chunk is good at:
@@ -105,7 +129,7 @@ markup a chunk is good at:
 {/foreach}
 ```
 
-### 2. Render the chunk through aLatteX explicitly
+### 3. Render the chunk through aLatteX explicitly
 
 A snippet can start a second Latte pass on purpose. `demo/snippets/latte.php`
 is the whole implementation:
@@ -130,7 +154,7 @@ Reusing the container's engine is safe here: the template pass has finished
 before `parseDocumentSource()` starts expanding snippets, so nothing is
 mid-render.
 
-### 3. Move the markup into the template
+### 4. Move the markup into the template
 
 If a chunk only exists to be Latte, it is a `{define}` block in the template.
 
@@ -191,6 +215,34 @@ Three things follow from running during the Latte pass:
 - **`runSnippet()`'s own cache parameters still apply.** `$evo->runSnippet($name,
   $params, $cacheTime)` caches through Evolution CMS's cache the same way it
   does anywhere else, which is the cheap way to keep a query off every request.
+
+### Eloquent and Laravel services
+
+Templates run inside the booted Evolution/Laravel application, so direct calls
+are technically possible:
+
+```latte
+{var $pages = EvolutionCMS\Models\SiteContent::query()
+    ->where('published', 1)
+    ->orderBy('menuindex')
+    ->limit(10)
+    ->get()}
+
+{var $service = app(App\Services\Catalogue::class)}
+{var $products = $service->featured()}
+```
+
+The same is true of `$evo`: `{$evo->getConfig('site_name')}` and
+`{var $rows = $evo->runSnippet('Rows', ['parent' => $id])}` are ordinary method
+calls. Latte does not provide a separate database API; it is executing PHP
+expressions in the existing application.
+
+Prefer a snippet or application service for real queries. It keeps SQL and
+authorization out of markup, is easier to test, and can return arrays or DTOs
+that Latte escapes normally. Direct Eloquent is useful for small internal
+templates and diagnostics, but it couples the view to the schema and makes an
+accidental query inside a loop easy. Eager-load relationships in the service
+and pass the finished data to the template.
 
 ---
 
@@ -414,6 +466,10 @@ do not build one from request data.
 template author has full expression power. This is not a regression against the
 CMS — Evolution CMS's own parser `eval()`s snippet PHP — but it does mean
 template editing is a privileged operation, as it already was.
+
+The same trust boundary applies to a chunk named by `chunk:`. Once a template
+loads it as a Latte partial, anyone allowed to edit that chunk can change
+executable Latte expressions on every page that includes it.
 
 ### Rules of thumb
 

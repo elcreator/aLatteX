@@ -113,8 +113,9 @@ Important caveats:
 
 - Latte runs before Evolution CMS parses chunks, snippets, TVs, settings, and
   placeholders.
-- Latte syntax inside chunks or snippet output is not processed later, because
-  those values are generated after Latte has already finished.
+- Latte syntax inside ordinary `{{chunks}}` or snippet output is not processed
+  later, because those values are generated after Latte has already finished.
+  A chunk explicitly loaded as `chunk:<name>` is a Latte partial instead.
 - Regular EVO tags written directly in the template are passed through for the
   default Evolution CMS parser to handle.
 
@@ -150,9 +151,25 @@ The template form's **Template code** switch has three settings:
 | *In a file* | `views/<templatealias>.latte`, edited wherever you edit code |
 | *Automatic* | the file if one matches the alias, the database otherwise (the default) |
 
-Choosing *In a file* with **Latte (.latte)** scaffolds the file and hands rendering to this plugin's view engine. Both routes go through the same pipeline — EVO tags are protected, Latte runs, tags are restored — so a template behaves identically whichever side of the switch it is on, and moving one across is a copy and paste.
+Choosing *In a file* with **Latte (.latte)** scaffolds the file and hands rendering to this plugin's view engine. Both routes protect EVO-looking syntax while Latte runs. A database template subsequently reaches Evolution's parser; a file template is already the final view, so restored EVO tags in it stay literal.
 
 The switch and the engine dropdown need Evolution CMS 3.5.9 or newer. On older cores a template whose alias matches `views/<alias>.latte` is still rendered from that file — the CMS has always preferred a matching view — there is simply no UI for creating one.
+
+### Layouts and chunk partials
+
+Template references are flat and match the files Evolution manages:
+
+```latte
+{layout 'base.latte'}
+{include 'navigation.latte'}
+{include 'chunk:ProductCard', product: $product}
+```
+
+`base.latte` and `navigation.latte` resolve under `views/`; directory and
+traversal names are rejected. A CMS-managed layout can be a non-selectable
+file template with alias `base`. The explicit `chunk:` prefix compiles that
+chunk as Latte and passes native Latte arguments. Without it, `{{ProductCard}}`
+keeps the existing EVO behavior and Latte source in the chunk stays literal.
 
 ### Available variables
 
@@ -162,6 +179,11 @@ The switch and the engine dropdown need Evolution CMS 3.5.9 or newer. On older c
 | `$documentObject`                | Full document array (all fields + TVs) |
 | `$pagetitle`, `$alias`, `$id`, … | All document fields spread as top-level variables |
 | `$content`                       | Raw document content (also available as `[*content*]`) |
+
+The booted application is available too: templates may call `$evo` methods,
+`app()`, application services, or Eloquent models. Prefer a snippet/service
+that returns arrays or DTOs for production queries; see
+[Eloquent and Laravel services](docs/interop.md#eloquent-and-laravel-services).
 
 ### Example template
 

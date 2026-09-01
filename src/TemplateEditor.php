@@ -65,17 +65,16 @@ class TemplateEditor
     /**
      * Tags Latte reports but aLatteX cannot run, so they are not offered.
      *
-     * Every one of them needs a second template to resolve a name against, and
-     * aLatteX renders a single string through a loader that holds one - see the
-     * "Not available here" table in docs/latte-syntax.md. `{php}` is in the list
-     * for a different reason: Latte 3 keeps the name only to tell you to write
-     * `{do}` instead.
+     * `{sandbox}` needs a security Policy aLatteX deliberately does not supply.
+     * `{php}` is in the list for a different reason: Latte 3 keeps the name only
+     * to tell you to write `{do}` instead. File and chunk references are now
+     * resolved by SourceLoader, so layout/extends/import/embed are offered.
      *
      * Filters are not filtered the same way: `|webalize` and `|localDate` need
      * a package and an extension that a site can perfectly well install, which
      * makes them a runtime question rather than a structural one.
      */
-    private const UNSUPPORTED_TAGS = ['layout', 'extends', 'import', 'embed', 'sandbox', 'php'];
+    private const UNSUPPORTED_TAGS = ['sandbox', 'php'];
 
     /**
      * The document fields aLatteX spreads as top-level Latte variables.

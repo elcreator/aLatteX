@@ -1,6 +1,6 @@
 # The demo set
 
-A working site's worth of aLatteX: six pages, six templates, five chunks, five
+A working site's worth of aLatteX: six pages, six templates, six chunks, five
 snippets and three template variables, installed into a real Evolution CMS
 database so you can open them in a browser and read them in the manager.
 
@@ -75,9 +75,9 @@ sent to the recycle bin, so a later reinstall does not collide with them.
 | Page | Template | What it proves |
 | --- | --- | --- |
 | `/alattex-demo` | `home.latte` | A realistic layout: one `{define}` filled per section, an index built in Latte, the same index built by a snippet through a chunk. |
-| `/alattex-basics` | `basics.latte` | Latte 3 in full - printing, filters, branching, every loop form, `n:` attributes, blocks, `{capture}`, `{spaceless}`, `{do}`, `{try}`. |
+| `/alattex-basics` | `basics.latte` | Latte 3 in full, including a CMS chunk loaded explicitly as a Latte partial with arguments. |
 | `/alattex-evo` | `evo-syntax.latte` | All six EVO tag forms verbatim, then the same six through the `evo*` Latte functions, then a snippet call assembled inside a `{foreach}`. |
-| `/alattex-chunks` | `chunks-and-snippets.latte` | Why Latte in a chunk prints literally, and the three ways round it. |
+| `/alattex-chunks` | `chunks-and-snippets.latte` | Why Latte in an ordinary chunk prints literally, and the explicit ways round it. |
 | `/alattex-raw` | `raw-output.latte` | `{syntax off}`, `{l}`/`{r}`, escaping contexts, and the fact that none of it stops the CMS parser. Plus the two brace traps. |
 | `/alattex-tvs` | `tvs-and-fields.latte` | Document fields, three TV types, `$documentObject` and `$evo` as Latte values. |
 
@@ -107,6 +107,7 @@ Every page carries two blocks in its content field, on top of its introduction:
 | `aLatteXDemoBadge` | Included from another chunk, and from PHP. |
 | `aLatteXDemoFooter` | `[[cacheable]]` beside `[!non-cacheable!]`, plus a nested chunk. |
 | `aLatteXDemoCard` | Latte *source* in a chunk - literal until something renders it. |
+| `aLatteXDemoPartial` | Explicitly included through `chunk:` and rendered as Latte with native arguments. |
 
 | Snippet | Point |
 | --- | --- |

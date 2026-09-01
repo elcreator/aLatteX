@@ -158,6 +158,10 @@
     {include alxNote, text: 'Included from a define, with arguments.'}
     {include alxNote, text: 'Second call, different level.', level: 'warn'}
 
+    {* `chunk:` is explicit: the same chunk reached through {{...}} would keep
+       this Latte source literal for Evolution's later parser pass. *}
+    {include 'chunk:aLatteXDemoPartial', title: 'Chunk-backed partial', items: $tags}
+
     {block #intro}<p>A named block, printed where it stands.</p>{/block}
 
     <div n:block="aside"><p>n:block turns an element into a block.</p></div>

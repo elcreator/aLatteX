@@ -66,6 +66,19 @@ class EvoSyntaxBridge
     /** @var array<string, string> Token map: token => original EVO tag */
     private array $tokens = [];
 
+    /**
+     * Start one top-level Latte render.
+     *
+     * A render may load several sources (a root template, layouts and
+     * partials), so protect() must accumulate their tokens. The map is reset
+     * here instead of in protect() to keep every source restorable until the
+     * complete rendered page is available.
+     */
+    public function beginRender(): void
+    {
+        $this->tokens = [];
+    }
+
     /** First character of an element name. */
     private const NAME_START = '(?:[A-Za-z_#@]|\[\+[^\]\[]*\+\])';
 
@@ -106,8 +119,6 @@ class EvoSyntaxBridge
      */
     public function protect(string $template): string
     {
-        $this->tokens = [];
-
         // A token has to be unforgeable. restore() is a str_replace over the
         // *rendered* page, and a token is plain alphanumeric text, so it
         // survives escaping unchanged - a document field holding the literal
@@ -123,11 +134,17 @@ class EvoSyntaxBridge
             . substr(hash_hmac('sha256', $template, TokenSecret::get()), 0, 16)
             . '_';
 
+        // The counter belongs to this source, not to the accumulated map. Its
+        // protected form must not depend on which layout or partial happened
+        // to be loaded before it, because that form participates in Latte's
+        // compiled-template cache identity.
+        $idx = 0;
+
         foreach (self::patterns() as $pattern) {
-            $template = preg_replace_callback($pattern, function (array $matches) use ($prefix): string {
-                $idx   = count($this->tokens);
+            $template = preg_replace_callback($pattern, function (array $matches) use ($prefix, &$idx): string {
                 $token = "{$prefix}{$idx}__";
                 $this->tokens[$token] = $matches[0];
+                $idx++;
                 return $token;
             }, $template);
         }

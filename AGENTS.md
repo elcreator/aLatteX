@@ -29,7 +29,7 @@ src/
   aLattexServiceProvider.php  Extends EvolutionCMS\ServiceProvider
   LattexEngine.php            Wraps Latte\Engine; owns the render pipeline
   LatteViewEngine.php         Illuminate view Engine for views/<alias>.latte
-  SourceLoader.php            Latte\Loader: names a template, source stays the cache key
+  SourceLoader.php            Latte\Loader: roots, flat views and chunk: partials
   TracyBridge.php             Wires the panel on; the only place Latte's Tracy bridge is touched
   TracyPanel.php              The aLatteX tab itself, against Tracy\IBarPanel
   EvoSyntaxBridge.php         Regex-based protect/restore for EVO tag syntax
@@ -55,7 +55,8 @@ tmp/                       Reference Evolution CMS packages — never modify
 ```
 OnLoadWebDocument event
   → LattexEngine::render($content, $documentObject)
-      → EvoSyntaxBridge::protect()      tokenise EVO tags
+      → EvoSyntaxBridge::beginRender()  reset the per-render token map
+      → SourceLoader::getContent()      load/protect roots, layouts and partials
       → Latte\Engine::renderToString()  process Latte syntax
       → EvoSyntaxBridge::restore()      restore EVO tags
   → evo()->documentContent = result
@@ -165,8 +166,8 @@ Snippet parameters: `[[name?&key=\`value\`&key2=\`value2\`]]`
 
 ## Latte 3.x API notes
 
-- `Engine::setLoader(new StringLoader())` — `StringLoader(null)` uses the content string itself as the unique ID; Latte hashes it when naming cache files. aLatteX uses `SourceLoader` instead, which separates the two: the *name* is short and printable, `getUniqueId()` is still the source, so the cache key is unchanged and the Tracy panel and `CompileException::$sourceName` stop carrying a whole template.
-- **Latte's Tracy bridge classes are `@internal`.** `Latte\Bridges\Tracy\LattePanel` is marked `@internal` and its only non-warning constructor `@deprecated`; `BlueScreenPanel` is `@internal` too. A patch release may move either, so the bar panel is *not* built on them: `src/TracyPanel.php` implements `Tracy\IBarPanel`, which carries no `@internal` and is two methods wide. Latte's nesting tree is the only thing given up, and aLatteX cannot produce one anyway — every tag that nests templates needs a second template to resolve a name against.
+- `Engine::setLoader(new StringLoader())` — `StringLoader(null)` uses the content string itself as the unique ID. aLatteX uses `SourceLoader`, which loads registered roots, flat `views/<alias>.latte` references and explicit `chunk:<name>` partials. Its unique ID is the readable name plus protected source: identical files retain distinct source mapping, and an edit creates a new compiled class immediately.
+- **Latte's Tracy bridge classes are `@internal`.** `Latte\Bridges\Tracy\LattePanel` is marked `@internal` and its only non-warning constructor `@deprecated`; `BlueScreenPanel` is `@internal` too. A patch release may move either, so the bar panel is *not* built on them: `src/TracyPanel.php` implements `Tracy\IBarPanel`, which carries no `@internal` and is two methods wide. The panel deliberately reports roots, layouts and partials as a flat timed list instead of depending on Latte's internal nesting panel.
 - `BlueScreenPanel::initialize()` is the one `@internal` call that remains, because reimplementing the compiled-PHP-to-`.latte` source mapping is not worth it. It is reached through `class_exists()` + `method_exists()` inside a `try/catch`, and `TracyBridge::extension()` swallows any Throwable from setup — a debugging aid must not be able to take down the site it is meant to help debug.
 - `Tracy\Debugger::isEnabled()` is the switch. `EvolutionCMS\ExceptionHandler` registers `TracyServiceProvider` (which calls `Debugger::enable()` when `tracy.active` resolves truthy) and `Core::initialize()` resolves that handler at the top of the request — before any event fires, so the lazily-made engine always sees a settled answer. It stays true in Tracy's production mode, where the bar is collected and never printed.
 - `Engine::setTempDirectory(string)` — compiled PHP cache location.
@@ -185,6 +186,7 @@ Snippet parameters: `[[name?&key=\`value\`&key2=\`value2\`]]`
 | Change the Latte cache location | `src/LattexEngine.php` → `resolveCacheDir()` |
 | Change what the Tracy panel shows, or its config keys | `src/TracyBridge.php` |
 | Change how a template is named in the panel and in errors | `src/LattexEngine.php` → `templateName()` / `renderView()` |
+| Change flat file or `chunk:` partial resolution | `src/SourceLoader.php` |
 | Add/remove Latte variables available in templates | `src/LattexEngine.php` → `render()`, `$params` array |
 | Change where the chunk_processor radio is injected | `plugins/aLattexPlugin.php` → the `OnSiteSettingsRender` listener |
 | Change the Resource content editor (mode, theme, options) | `src/ManagerEditor.php` |
@@ -201,7 +203,10 @@ Snippet parameters: `[[name?&key=\`value\`&key2=\`value2\`]]`
 
 - Do not edit anything under `vendor/` or `tmp/`.
 - Do not call `evo()->parseDocumentSource()` from within the plugin — it runs automatically after `OnLoadWebDocument` completes.
-- Do not add a second `protect()`/`restore()` cycle; `EvoSyntaxBridge` is stateful per render call and must not be reused across requests (it is instantiated inside `LattexEngine` which is a singleton — the token map is reset at the start of each `protect()` call, which is correct).
+- Do not add a second `protect()`/`restore()` cycle. `EvoSyntaxBridge` accumulates
+  tokens from every source in one top-level render: `beginRender()` resets the
+  map once, while each loader `getContent()` protects and adds to it. Resetting
+  inside `protect()` loses the root or layout tokens.
 - Do not override core Blade views to inject the admin panel option; use the JS injection approach already in place.
 - Do not return `null` from event listeners — return `''` to produce no output.
 - Do not make the bridge's token prefix predictable, and do not derive it from

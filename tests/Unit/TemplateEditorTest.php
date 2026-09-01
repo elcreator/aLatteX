@@ -81,13 +81,12 @@ test('the vocabulary reaches the script, minus what aLatteX cannot run', functio
         'functions' => ['evoChunk', 'evoSnippet', 'hasBlock'],
     ]);
 
-    foreach (['if', 'foreach', 'include', 'upper', 'truncate', 'evoChunk', 'evoSnippet', 'hasBlock'] as $offered) {
+    foreach (['if', 'foreach', 'include', 'extends', 'layout', 'import', 'embed',
+        'upper', 'truncate', 'evoChunk', 'evoSnippet', 'hasBlock'] as $offered) {
         assertStringContains('"' . $offered . '"', $script);
     }
 
-    // Each of these needs a second template to resolve a name against, which
-    // the single-template loader cannot give it - see docs/latte-syntax.md.
-    foreach (['extends', 'layout', 'import', 'embed', 'sandbox', 'php'] as $withheld) {
+    foreach (['sandbox', 'php'] as $withheld) {
         assertStringNotContains('"' . $withheld . '"', $script);
     }
 });

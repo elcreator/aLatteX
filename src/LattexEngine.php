@@ -33,11 +33,12 @@ class LattexEngine
     private EvoSyntaxBridge $bridge;
     private SourceLoader $loader;
 
-    public function __construct()
+    /** @param list<string>|null $viewPaths */
+    public function __construct(?array $viewPaths = null)
     {
         $this->bridge = new EvoSyntaxBridge();
         $this->latte  = new Engine();
-        $this->loader = new SourceLoader();
+        $this->loader = new SourceLoader($this->bridge, $viewPaths ?? $this->resolveViewPaths());
 
         $cacheDir = $this->resolveCacheDir();
         $this->latte->setTempDirectory($cacheDir);
@@ -67,8 +68,9 @@ class LattexEngine
      */
     public function render(string $templateContent, array $documentObject = []): string
     {
-        // 1. Protect EVO tags
-        $protected = $this->bridge->protect($templateContent);
+        // One render can load a root, layout and several partials. Their EVO
+        // token maps live together until the complete output is restored.
+        $this->bridge->beginRender();
 
         // 2. Build Latte params: spread document fields as top-level variables
         //    plus keep $evo and $documentObject for structured access.
@@ -87,7 +89,7 @@ class LattexEngine
 
         // 3. Render through Latte, under a name that says which template this is
         $rendered = $this->latte->renderToString(
-            $this->loader->add($this->templateName($fields), $protected),
+            $this->loader->add($this->templateName($fields), $templateContent),
             $params
         );
 
@@ -134,12 +136,12 @@ class LattexEngine
             ]
         );
 
-        $protected = $this->bridge->protect($contents);
+        $this->bridge->beginRender();
 
         // The file's own path is the name here, so Tracy's panel and its
         // BlueScreen can offer to open the template in an editor.
         $rendered = $this->latte->renderToString(
-            $this->loader->add($path, $protected),
+            $this->loader->add($path, $contents),
             $params
         );
 
@@ -216,5 +218,26 @@ class LattexEngine
         }
 
         return $dir;
+    }
+
+    /** @return list<string> */
+    private function resolveViewPaths(): array
+    {
+        if (function_exists('config')) {
+            try {
+                $paths = array_values(array_filter(
+                    (array) config('view.paths', []),
+                    static fn(mixed $path): bool => is_string($path) && $path !== '',
+                ));
+                if ($paths !== []) {
+                    return $paths;
+                }
+            } catch (\Throwable) {
+                // A standalone test or console context can have Laravel's
+                // helper without a booted config repository.
+            }
+        }
+
+        return defined('EVO_BASE_PATH') ? [EVO_BASE_PATH . 'views/'] : [];
     }
 }
