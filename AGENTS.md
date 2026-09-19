@@ -197,6 +197,7 @@ Snippet parameters: `[[name?&key=\`value\`&key2=\`value2\`]]`
 | Change the Resource content editor (mode, theme, options) | `src/ManagerEditor.php` |
 | Change Latte highlighting or completion in the template editor | `src/TemplateEditor.php` |
 | Add Latte filters or tags | `src/EvoExtension.php` → `getFilters()` / `getTags()` |
+| Let another package add Latte functions | `LattexEngine::addExtension()` — call it from `afterResolving(LattexEngine::class)`, before the first compile |
 | Register routes, migrations, or views | `src/aLattexServiceProvider.php` → `boot()` |
 | Add or change a demo page/element | `demo/manifest.php` plus the file it names |
 | Change how the demo is written to the DB | `src/Demo/DemoSeeder.php` |
@@ -207,7 +208,7 @@ Snippet parameters: `[[name?&key=\`value\`&key2=\`value2\`]]`
 ## What not to do
 
 - Do not edit anything under `vendor/` or `tmp/`.
-- Do not call `evo()->parseDocumentSource()` on a template held in the database — the core runs it automatically once `OnLoadWebDocument` completes, and a second call parses the page twice. The exception is the view-file path, where the core's `if (!$template)` gate means it never runs at all: `alattexFinishViewRender()` does it there, and only there, so a template moved into `views/<alias>.latte` keeps its meaning.
+- Do not call `evo()->parseDocumentSource()` on a template held in the database — the core runs it automatically once `OnLoadWebDocument` completes, and a second call parses the page twice. The view-file path is the exception, where the core skips the parser by default: ask for it with `$evo->runDocumentParser = true` (Evolution CMS 3.5.8+, still open while `OnLoadWebDocument` runs) rather than re-running the passes. `alattexFinishViewRender()` does that, and keeps the by-hand passes only as the fallback for an older core, so a template moved into `views/<alias>.latte` keeps its meaning. The `alattex.evo_tags` config turns the whole thing off; it defaults to true.
 - Do not add a second `protect()`/`restore()` cycle. `EvoSyntaxBridge` accumulates
   tokens from every source in one top-level render: `beginRender()` resets the
   map once, while each loader `getContent()` protects and adds to it. Resetting

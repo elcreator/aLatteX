@@ -3,6 +3,7 @@
 namespace Elcreator\aLatteX;
 
 use Latte\Engine;
+use Latte\Extension;
 
 /**
  * Wraps the Latte 3.x engine for use as an Evolution CMS template processor.
@@ -58,6 +59,18 @@ class LattexEngine
     }
 
     /**
+     * Add a Latte extension: another package's tags, filters and functions.
+     *
+     * Latte takes extensions only before its first compile, so a package
+     * should add its own when the engine is resolved (afterResolving) rather
+     * than from a later provider's boot().
+     */
+    public function addExtension(Extension $extension): void
+    {
+        $this->latte->addExtension($extension);
+    }
+
+    /**
      * Render a DB template string through Latte and return the result.
      * EVO syntax in the template is preserved and returned verbatim so that
      * Evolution CMS's own parseDocumentSource() can handle it afterwards.
@@ -103,7 +116,7 @@ class LattexEngine
      * EVO tags are protected during the Latte pass, the same as in render(),
      * and restored afterwards. The core would then leave them as text - it
      * skips parseDocumentSource() for a view-rendered document - so the plugin
-     * runs those passes itself once the view is back; see
+     * asks for those passes once the view is back; see
      * alattexFinishViewRender() in plugins/aLattexPlugin.php. The effect is
      * that a template kept in views/<alias>.latte behaves exactly like the same
      * code kept in the database, which is the point: where a template lives is

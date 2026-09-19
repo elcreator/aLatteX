@@ -29,23 +29,16 @@ Event::listen('evolution.OnLoadWebDocument', function (): void {
     // best, and at worst it aborts on the first brace of an inline stylesheet
     // and logs an error on every request.
     //
-    // What that file *does* still need is the rest of the pipeline. Core.php
-    // gates the EVO parser on the same fact:
+    // What that file *does* still need is the rest of the pipeline, which the
+    // core skips for it: parseDocumentSource(), the [!…!] pass,
+    // cleanUpMODXTags() and rewriteUrls() - so every EVO tag in it would reach
+    // the page as text. For aLatteX that is the wrong trade: where a template
+    // lives is a version-control decision, not a syntax one, and the same
+    // template must mean the same thing in the database and in a file.
     //
-    //     if (!$template) {
-    //         $this->documentContent = $this->parseDocumentSource($this->documentContent);
-    //     }
-    //     ...
-    //     $template ? $this->outputContent(false, false) : $this->outputContent();
-    //
-    // so a view-rendered document skips parseDocumentSource(), the [!…!] pass,
-    // cleanUpMODXTags() and rewriteUrls() - and every EVO tag in it reaches the
-    // page as text. For aLatteX that is the wrong trade: where a template lives
-    // is a version-control decision, not a syntax one, and the same template
-    // must mean the same thing in the database and in a file.
-    //
-    // finishViewRender() runs those passes here. It is scoped to .latte files:
-    // Blade's identical behaviour is Blade's to change, not this plugin's.
+    // finishViewRender() asks for those passes here. It is scoped to .latte
+    // files: Blade's identical behaviour is Blade's to change, not this
+    // plugin's.
     $renderedFromView = property_exists($evo, 'documentTemplateView')
         ? (string) $evo->documentTemplateView
         : '';
@@ -266,20 +259,48 @@ Event::listen('evolution.OnTempFormRender', function (): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Give a view-rendered document the parser passes the core skips for it.
+ * Is the EVO pass wanted over what a .latte view file produced?
  *
- * Core.php takes a different branch for a document whose template resolves to a
+ * On by default: the point of the pass is that the same template means the same
+ * thing whether it is kept in the database or in a file, and a site that has
+ * moved a template into views/ has not asked for its tags to stop working.
+ *
+ * A site whose .latte files are pure Latte - no EVO tags anywhere, output that
+ * happens to contain `[[`, `{{` or `[*` as literal text - sets
+ * `alattex.evo_tags` to false and gets the core's own behaviour back: the file's
+ * output is final and nothing runs a second dialect over it.
+ */
+function alattexEvoTagsEnabled(): bool
+{
+    if (!function_exists('config')) {
+        return true;
+    }
+
+    return (bool) config('alattex.evo_tags', true);
+}
+
+/**
+ * Ask for the parser passes the core skips for a view-rendered document.
+ *
+ * The core takes a different branch for a document whose template resolves to a
  * file, and that branch omits four things the database branch does:
  *
- *   1. parseDocumentSource() - gated on `if (!$template)`;
+ *   1. parseDocumentSource();
  *   2. the [!non-cacheable!] pass, and
  *   3. cleanUpMODXTags() + rewriteUrls() - all three skipped because the file
- *      branch calls outputContent(false, false), turning $postParse off;
+ *      branch post-parses with $postParse off;
  *   4. the page cache, because that branch also forces cacheable = 0 and never
  *      registers postProcess(). That one cannot be restored from here.
  *
- * 1 to 3 are what make EVO tags work, so they are run here in the core's own
- * order, using the core's own methods. The result is that moving a template
+ * 1 to 3 are what make EVO tags work. Evolution CMS 3.5.8 turned that decision
+ * into `Core::$runDocumentParser`, set from `!$template` and still open while
+ * OnLoadWebDocument runs, precisely so a view engine whose syntax survives the
+ * pass can ask for it instead of re-implementing it: setting the property back
+ * to true hands the whole tail to the core, in the core's own order. That is
+ * the path taken here whenever the core offers the property.
+ *
+ * Against an older core there is no property to set, so the same three passes
+ * are run by hand, with the core's own methods. Either way, moving a template
  * from the database into views/<alias>.latte changes where it is stored and
  * nothing else.
  *
@@ -289,6 +310,10 @@ Event::listen('evolution.OnTempFormRender', function (): string {
  */
 function alattexFinishViewRender(object $evo): void
 {
+    if (!alattexEvoTagsEnabled()) {
+        return;
+    }
+
     $viewPath = '';
 
     try {
@@ -299,6 +324,16 @@ function alattexFinishViewRender(object $evo): void
     }
 
     if (!str_ends_with(strtolower($viewPath), '.latte')) {
+        return;
+    }
+
+    // Evolution CMS 3.5.8 and up. The core has not read the property yet - this
+    // event fires while the decision is open - so nothing else is needed: the
+    // parser pass, the [!…!] rewrite, cleanUpMODXTags() and rewriteUrls() all
+    // follow it.
+    if (property_exists($evo, 'runDocumentParser')) {
+        $evo->runDocumentParser = true;
+
         return;
     }
 

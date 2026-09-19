@@ -151,7 +151,7 @@ The template form's **Template code** switch has three settings:
 | *In a file* | `views/<templatealias>.latte`, edited wherever you edit code |
 | *Automatic* | the file if one matches the alias, the database otherwise (the default) |
 
-Choosing *In a file* with **Latte (.latte)** scaffolds the file and hands rendering to this plugin's view engine. The two routes are otherwise the same: same Latte, same EVO tags, same output. The core skips its parser for a view-rendered document, so aLatteX runs those passes itself - see [docs/interop.md](docs/interop.md#rendering-from-a-latte-file). The one thing a file template does not get is Evolution's page cache, which that code path never writes.
+Choosing *In a file* with **Latte (.latte)** scaffolds the file and hands rendering to this plugin's view engine. The two routes are otherwise the same: same Latte, same EVO tags, same output. The core skips its parser for a view-rendered document, so aLatteX asks for it back — set `'evo_tags' => false` in `core/custom/config/alattex.php` if your `.latte` files are pure Latte and should be left alone; see [docs/interop.md](docs/interop.md#rendering-from-a-latte-file). The one thing a file template does not get is Evolution's page cache, which that code path never writes.
 
 The switch and the engine dropdown need Evolution CMS 3.5.9 or newer. On older cores a template whose alias matches `views/<alias>.latte` is still rendered from that file — the CMS has always preferred a matching view — there is simply no UI for creating one.
 

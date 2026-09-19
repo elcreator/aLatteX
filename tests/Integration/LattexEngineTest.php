@@ -78,3 +78,21 @@ HTML;
     assertStringNotContains('&lt;article&gt;', $rendered);
     assertStringNotContains('__ALATTEX_', $rendered);
 });
+
+test('a package can add its own Latte functions through addExtension()', function (): void {
+    if (!class_exists(\Latte\Engine::class)) {
+        skip('Latte dependency is not installed; run composer install first.');
+    }
+
+    useFakeEvo(documentObject: ['id' => 1, 'pagetitle' => 'Ext']);
+
+    $engine = new LattexEngine([]);
+    $engine->addExtension(new class extends \Latte\Extension {
+        public function getFunctions(): array
+        {
+            return ['shout' => static fn (string $s): string => strtoupper($s) . '!'];
+        }
+    });
+
+    assertSame('EXT!', $engine->render('{shout($pagetitle)}', ['pagetitle' => 'Ext']));
+});

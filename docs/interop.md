@@ -392,28 +392,52 @@ file through `LatteViewEngine`. **It behaves exactly like the same code kept in
 the database** - same Latte, same EVO tags, same output. Where a template lives
 is a version-control decision, not a syntax one.
 
-That takes work, because the core does not treat the two the same. `Core.php`
-branches on whether a view file was found:
+That takes work, because the core does not treat the two the same. Its default
+for a document rendered from a file is that the file's output is finished - so
+`parseDocumentSource()`, the `[!…!]` pass, `cleanUpMODXTags()` and
+`rewriteUrls()` are all skipped, and every EVO tag in it would reach the page as
+text.
+
+Evolution CMS 3.5.8 made that one property, and leaves it open for exactly this
+case:
 
 ```php
 $template = TemplateProcessor::getBladeDocumentContent();   // truthy iff a view file exists
 ...
-$this->invokeEvent('OnLoadWebDocument');
+$this->runDocumentParser = !$template;
 
-if (!$template) {
+$this->invokeEvent('OnLoadWebDocument');   // <- the plugin runs here
+
+if ($this->runDocumentParser) {
     $this->documentContent = $this->parseDocumentSource($this->documentContent);
 }
 ...
-$template ? $this->outputContent(false, false) : $this->outputContent();
+$this->outputContent(false, $this->runDocumentParser);
 ```
 
-A view-rendered document therefore skips `parseDocumentSource()`, the `[!…!]`
-pass, `cleanUpMODXTags()` and `rewriteUrls()` - every EVO tag in it would reach
-the page as text. `alattexFinishViewRender()` in `plugins/aLattexPlugin.php`
-runs those passes, in the core's order and with the core's own methods, for
-`.latte` views only. A `.blade.php` template reaches the same branch and keeps
-the core's behaviour; that is Blade's contract with the CMS to change, not this
-plugin's.
+`alattexFinishViewRender()` in `plugins/aLattexPlugin.php` sets
+`$evo->runDocumentParser = true` for `.latte` views, and the core runs the whole
+tail itself, in its own order. Against a core older than 3.5.8 there is no
+property to set, and the plugin runs the same three passes by hand with the
+core's own methods; the outcome is the same either way. A `.blade.php` template
+reaches the same branch and keeps the core's behaviour; that is Blade's contract
+with the CMS to change, not this plugin's.
+
+**Turning it off.** A site whose `.latte` files are pure Latte - no EVO tags,
+and output that may contain `[[`, `{{` or `[*` as literal text - can decline the
+pass in `core/custom/config/alattex.php`:
+
+```php
+<?php
+
+return [
+    'evo_tags' => false,   // default true: run the EVO parser over .latte view output
+];
+```
+
+That switch covers view files only. A template held in the database is parsed by
+the core whatever this says - it is template source, and reading it is not
+aLatteX's decision to reverse.
 
 **One difference is left, and cannot be closed from a plugin.** The same branch
 forces `cacheable = 0` and never registers `postProcess()`, so a view-rendered
