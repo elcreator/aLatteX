@@ -112,12 +112,8 @@ Event::listen('evolution.OnLoadWebDocument', function (): void {
 Event::listen('evolution.OnSiteSettingsRender', function (): string {
     $evo = evo();
 
-    // json_encode, not htmlspecialchars: this lands in a JavaScript string
-    // literal, not in markup.
-    $currentValue = json_encode(
-        (string) $evo->getConfig('chunk_processor'),
-        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
-    );
+    // Only the answer reaches the script, never the stored value.
+    $isCurrent = (string) $evo->getConfig('chunk_processor') === 'aLatteX' ? 'true' : 'false';
 
     return <<<HTML
 <script>
@@ -153,7 +149,7 @@ Event::listen('evolution.OnSiteSettingsRender', function (): string {
         // Configure the new radio. The clone carries whatever checked attribute
         // the cloned option was rendered with, so clear it as well as the
         // property - otherwise two options claim to be checked in the markup.
-        var isCurrent = ({$currentValue} === 'aLatteX');
+        var isCurrent = {$isCurrent};
 
         newInput.value = 'aLatteX';
         newInput.id    = 'chunk_processor_alattex';
