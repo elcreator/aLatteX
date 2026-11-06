@@ -112,12 +112,8 @@ Event::listen('evolution.OnLoadWebDocument', function (): void {
 Event::listen('evolution.OnSiteSettingsRender', function (): string {
     $evo = evo();
 
-    // json_encode, not htmlspecialchars: this lands in a JavaScript string
-    // literal, not in markup.
-    $currentValue = json_encode(
-        (string) $evo->getConfig('chunk_processor'),
-        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
-    );
+    // Only the answer reaches the script, never the stored value.
+    $isCurrent = (string) $evo->getConfig('chunk_processor') === 'aLatteX' ? 'true' : 'false';
 
     return <<<HTML
 <script>
@@ -153,7 +149,7 @@ Event::listen('evolution.OnSiteSettingsRender', function (): string {
         // Configure the new radio. The clone carries whatever checked attribute
         // the cloned option was rendered with, so clear it as well as the
         // property - otherwise two options claim to be checked in the markup.
-        var isCurrent = ({$currentValue} === 'aLatteX');
+        var isCurrent = {$isCurrent};
 
         newInput.value = 'aLatteX';
         newInput.id    = 'chunk_processor_alattex';
@@ -258,117 +254,124 @@ Event::listen('evolution.OnTempFormRender', function (): string {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Is the EVO pass wanted over what a .latte view file produced?
- *
- * On by default: the point of the pass is that the same template means the same
- * thing whether it is kept in the database or in a file, and a site that has
- * moved a template into views/ has not asked for its tags to stop working.
- *
- * A site whose .latte files are pure Latte - no EVO tags anywhere, output that
- * happens to contain `[[`, `{{` or `[*` as literal text - sets
- * `alattex.evo_tags` to false and gets the core's own behaviour back: the file's
- * output is final and nothing runs a second dialect over it.
- */
-function alattexEvoTagsEnabled(): bool
-{
-    if (!function_exists('config')) {
-        return true;
-    }
+// A worker with a new application per request includes this file on every
+// request, in a process that keeps its functions.
 
-    return (bool) config('alattex.evo_tags', true);
-}
-
-/**
- * Ask for the parser passes the core skips for a view-rendered document.
- *
- * The core takes a different branch for a document whose template resolves to a
- * file, and that branch omits four things the database branch does:
- *
- *   1. parseDocumentSource();
- *   2. the [!non-cacheable!] pass, and
- *   3. cleanUpMODXTags() + rewriteUrls() - all three skipped because the file
- *      branch post-parses with $postParse off;
- *   4. the page cache, because that branch also forces cacheable = 0 and never
- *      registers postProcess(). That one cannot be restored from here.
- *
- * 1 to 3 are what make EVO tags work. Evolution CMS 3.5.8 turned that decision
- * into `Core::$runDocumentParser`, set from `!$template` and still open while
- * OnLoadWebDocument runs, precisely so a view engine whose syntax survives the
- * pass can ask for it instead of re-implementing it: setting the property back
- * to true hands the whole tail to the core, in the core's own order. That is
- * the path taken here whenever the core offers the property.
- *
- * Against an older core there is no property to set, so the same three passes
- * are run by hand, with the core's own methods. Either way, moving a template
- * from the database into views/<alias>.latte changes where it is stored and
- * nothing else.
- *
- * Only .latte views are touched. A .blade.php template reaches the same core
- * branch and behaves the same way; that is Blade's contract with the CMS and
- * this plugin has no business rewriting it.
- */
-function alattexFinishViewRender(object $evo): void
-{
-    if (!alattexEvoTagsEnabled()) {
-        return;
-    }
-
-    $viewPath = '';
-
-    try {
-        $viewPath = (string) app('TemplateProcessor')->getDocumentViewPath();
-    } catch (\Throwable) {
-        // No TemplateProcessor, no way to tell whose view this is: leave it be.
-        return;
-    }
-
-    if (!str_ends_with(strtolower($viewPath), '.latte')) {
-        return;
-    }
-
-    // Evolution CMS 3.5.8 and up. The core has not read the property yet - this
-    // event fires while the decision is open - so nothing else is needed: the
-    // parser pass, the [!…!] rewrite, cleanUpMODXTags() and rewriteUrls() all
-    // follow it.
-    if (property_exists($evo, 'runDocumentParser')) {
-        $evo->runDocumentParser = true;
-
-        return;
-    }
-
-    $content = (string) $evo->documentContent;
-
-    if ($content === '') {
-        return;
-    }
-
-    try {
-        $content = $evo->parseDocumentSource($content);
-
-        // outputContent() does this when it post-parses: a non-cacheable tag is
-        // a cacheable one that was held back, so it is rewritten and parsed on
-        // a second pass. A view-rendered document is never page-cached, so the
-        // distinction is moot for it - but [!name!] still has to resolve.
-        if (str_contains($content, '[!')) {
-            $content = str_replace(['[!', '!]'], ['[[', ']]'], $content);
-            $evo->minParserPasses = 2;
-            $content = $evo->parseDocumentSource($content);
+if (!function_exists('alattexEvoTagsEnabled')) {
+    /**
+     * Is the EVO pass wanted over what a .latte view file produced?
+     *
+     * On by default: the point of the pass is that the same template means the same
+     * thing whether it is kept in the database or in a file, and a site that has
+     * moved a template into views/ has not asked for its tags to stop working.
+     *
+     * A site whose .latte files are pure Latte - no EVO tags anywhere, output that
+     * happens to contain `[[`, `{{` or `[*` as literal text - sets
+     * `alattex.evo_tags` to false and gets the core's own behaviour back: the file's
+     * output is final and nothing runs a second dialect over it.
+     */
+    function alattexEvoTagsEnabled(): bool
+    {
+        if (!function_exists('config')) {
+            return true;
         }
 
-        $content = $evo->cleanUpMODXTags($content);
-        $content = $evo->rewriteUrls($content);
+        return (bool) config('alattex.evo_tags', true);
+    }
+}
 
-        $evo->documentContent = $content;
-    } catch (\Throwable $e) {
-        // The page already has its markup; losing the EVO pass leaves tags on
-        // screen, which is bad, but taking the page down is worse.
-        $evo->logEvent(
-            0,
-            3,
-            'aLatteX could not finish the parser passes for ' . htmlspecialchars($viewPath)
-                . ': ' . $e->getMessage(),
-            'aLatteX'
-        );
+if (!function_exists('alattexFinishViewRender')) {
+    /**
+     * Ask for the parser passes the core skips for a view-rendered document.
+     *
+     * The core takes a different branch for a document whose template resolves to a
+     * file, and that branch omits four things the database branch does:
+     *
+     *   1. parseDocumentSource();
+     *   2. the [!non-cacheable!] pass, and
+     *   3. cleanUpMODXTags() + rewriteUrls() - all three skipped because the file
+     *      branch post-parses with $postParse off;
+     *   4. the page cache, because that branch also forces cacheable = 0 and never
+     *      registers postProcess(). That one cannot be restored from here.
+     *
+     * 1 to 3 are what make EVO tags work. Evolution CMS 3.5.8 turned that decision
+     * into `Core::$runDocumentParser`, set from `!$template` and still open while
+     * OnLoadWebDocument runs, precisely so a view engine whose syntax survives the
+     * pass can ask for it instead of re-implementing it: setting the property back
+     * to true hands the whole tail to the core, in the core's own order. That is
+     * the path taken here whenever the core offers the property.
+     *
+     * Against an older core there is no property to set, so the same three passes
+     * are run by hand, with the core's own methods. Either way, moving a template
+     * from the database into views/<alias>.latte changes where it is stored and
+     * nothing else.
+     *
+     * Only .latte views are touched. A .blade.php template reaches the same core
+     * branch and behaves the same way; that is Blade's contract with the CMS and
+     * this plugin has no business rewriting it.
+     */
+    function alattexFinishViewRender(object $evo): void
+    {
+        if (!alattexEvoTagsEnabled()) {
+            return;
+        }
+
+        $viewPath = '';
+
+        try {
+            $viewPath = (string) app('TemplateProcessor')->getDocumentViewPath();
+        } catch (\Throwable) {
+            // No TemplateProcessor, no way to tell whose view this is: leave it be.
+            return;
+        }
+
+        if (!str_ends_with(strtolower($viewPath), '.latte')) {
+            return;
+        }
+
+        // Evolution CMS 3.5.8 and up. The core has not read the property yet - this
+        // event fires while the decision is open - so nothing else is needed: the
+        // parser pass, the [!…!] rewrite, cleanUpMODXTags() and rewriteUrls() all
+        // follow it.
+        if (property_exists($evo, 'runDocumentParser')) {
+            $evo->runDocumentParser = true;
+
+            return;
+        }
+
+        $content = (string) $evo->documentContent;
+
+        if ($content === '') {
+            return;
+        }
+
+        try {
+            $content = $evo->parseDocumentSource($content);
+
+            // outputContent() does this when it post-parses: a non-cacheable tag is
+            // a cacheable one that was held back, so it is rewritten and parsed on
+            // a second pass. A view-rendered document is never page-cached, so the
+            // distinction is moot for it - but [!name!] still has to resolve.
+            if (str_contains($content, '[!')) {
+                $content = str_replace(['[!', '!]'], ['[[', ']]'], $content);
+                $evo->minParserPasses = 2;
+                $content = $evo->parseDocumentSource($content);
+            }
+
+            $content = $evo->cleanUpMODXTags($content);
+            $content = $evo->rewriteUrls($content);
+
+            $evo->documentContent = $content;
+        } catch (\Throwable $e) {
+            // The page already has its markup; losing the EVO pass leaves tags on
+            // screen, which is bad, but taking the page down is worse.
+            $evo->logEvent(
+                0,
+                3,
+                'aLatteX could not finish the parser passes for ' . htmlspecialchars($viewPath)
+                    . ': ' . $e->getMessage(),
+                'aLatteX'
+            );
+        }
     }
 }
